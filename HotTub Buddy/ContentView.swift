@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  HotTub
+//  HotTub Buddy
 //
 
 import SwiftData
@@ -35,8 +35,10 @@ private func makePreviewModelContainer() -> ModelContainer {
     }
 }
 
+/// Marker so preview runs can replace the same sample rows without touching user-style data.
 private let previewSampleDailyLogNote = "Preview sample (Canvas only)"
 
+/// Five March daily logs: pH 7–7.5, free chlorine 1–5 ppm. Only used from `#Preview` in-memory store.
 private func seedPreviewSampleDailyLogs(into context: ModelContext) {
     let existing = (try? context.fetch(FetchDescriptor<HotTubDailyLog>())) ?? []
     for log in existing where log.notes == previewSampleDailyLogNote {
@@ -44,6 +46,7 @@ private func seedPreviewSampleDailyLogs(into context: ModelContext) {
     }
 
     let year = Calendar.current.component(.year, from: Date())
+    /// (March day, pH, free chlorine ppm, time HH:mm:ss)
     let rows: [(Int, Double, Double, String)] = [
         (4, 7.08, 1.4, "09:10:00"),
         (8, 7.18, 2.6, "10:25:00"),
@@ -68,6 +71,7 @@ private func seedPreviewSampleDailyLogs(into context: ModelContext) {
     try? context.save()
 }
 
+/// Wraps `ContentView` and injects preview-only SwiftData rows (in-memory container only).
 private struct ContentViewPreviewHost: View {
     @Environment(\.modelContext) private var modelContext
 
