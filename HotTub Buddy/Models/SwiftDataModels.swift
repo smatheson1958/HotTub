@@ -57,22 +57,16 @@ final class AppSettings {
 
 @Model
 final class HotTubDailyLog {
-    var logDate: String
-    var logTime: String
+    /// When the reading was taken (date and time).
+    var loggedAt: Date
     var createdAt: Date
 
     var waterTemperature: Int?
 
     var ph: Double?
     var sanitizerFree: Double?
-    var sanitizerCombinedOrTotal: Double?
+    var sanitizerCombined: Double?
 
-    /// Free / combined / total sanitizer readings (React `chlorine_1`…`chlorine_3`).
-    var chlorine1: Double?
-    var chlorine2: Double?
-    var chlorine3: Double?
-
-    var addedChlorine: Double
     var addedPhUp: Double
     var addedPhDown: Double
     var addedSanitizer: Double
@@ -80,42 +74,32 @@ final class HotTubDailyLog {
     var notes: String?
 
     init(
-        logDate: String,
-        logTime: String,
+        loggedAt: Date,
         createdAt: Date = .now,
         waterTemperature: Int? = nil,
         ph: Double? = nil,
         sanitizerFree: Double? = nil,
-        sanitizerCombinedOrTotal: Double? = nil,
-        chlorine1: Double? = nil,
-        chlorine2: Double? = nil,
-        chlorine3: Double? = nil,
-        addedChlorine: Double = 0,
+        sanitizerCombined: Double? = nil,
         addedPhUp: Double = 0,
         addedPhDown: Double = 0,
         addedSanitizer: Double = 0,
         notes: String? = nil
     ) {
-        self.logDate = logDate
-        self.logTime = logTime
+        self.loggedAt = loggedAt
         self.createdAt = createdAt
         self.waterTemperature = waterTemperature
         self.ph = ph
         self.sanitizerFree = sanitizerFree
-        self.sanitizerCombinedOrTotal = sanitizerCombinedOrTotal
-        self.chlorine1 = chlorine1
-        self.chlorine2 = chlorine2
-        self.chlorine3 = chlorine3
-        self.addedChlorine = addedChlorine
+        self.sanitizerCombined = sanitizerCombined
         self.addedPhUp = addedPhUp
         self.addedPhDown = addedPhDown
         self.addedSanitizer = addedSanitizer
         self.notes = notes
     }
 
-    /// Primary ppm reading for consumption math (prefers `chlorine_1`, then free sanitizer).
+    /// Primary ppm reading for charts and consumption math (free sanitizer / bromine).
     var primarySanitizerPpm: Double? {
-        chlorine1 ?? sanitizerFree
+        sanitizerFree
     }
 }
 
@@ -123,12 +107,12 @@ final class HotTubDailyLog {
 
 @Model
 final class WeeklyCheckLog {
-    var logDate: String
-    var logTime: String
+    var loggedAt: Date
     var createdAt: Date
 
     var combinedChlorine: Double?
-    var totalChlorine: Double?
+    /// Total sanitizer reading (ppm), e.g. total chlorine or total bromine on weekly check.
+    var sanitizerTotal: Double?
     var totalAlkalinity: Double?
     var copper: Double?
     var shockAdded: Double?
@@ -136,30 +120,37 @@ final class WeeklyCheckLog {
     var alkalinityUpAdded: Double?
     var notes: String?
 
+    /// Free-text water clarity (e.g. clear, hazy).
+    var waterClarity: String
+    /// Whether foam was present on inspection.
+    var foamPresent: Bool
+
     init(
-        logDate: String,
-        logTime: String,
+        loggedAt: Date,
         createdAt: Date = .now,
         combinedChlorine: Double? = nil,
-        totalChlorine: Double? = nil,
+        sanitizerTotal: Double? = nil,
         totalAlkalinity: Double? = nil,
         copper: Double? = nil,
         shockAdded: Double? = nil,
         shockType: String = "",
         alkalinityUpAdded: Double? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        waterClarity: String = "",
+        foamPresent: Bool = false
     ) {
-        self.logDate = logDate
-        self.logTime = logTime
+        self.loggedAt = loggedAt
         self.createdAt = createdAt
         self.combinedChlorine = combinedChlorine
-        self.totalChlorine = totalChlorine
+        self.sanitizerTotal = sanitizerTotal
         self.totalAlkalinity = totalAlkalinity
         self.copper = copper
         self.shockAdded = shockAdded
         self.shockType = shockType
         self.alkalinityUpAdded = alkalinityUpAdded
         self.notes = notes
+        self.waterClarity = waterClarity
+        self.foamPresent = foamPresent
     }
 }
 
@@ -167,8 +158,7 @@ final class WeeklyCheckLog {
 
 @Model
 final class MaintenanceLogEntry {
-    var logDate: String
-    var logTime: String
+    var loggedAt: Date
     var createdAt: Date
 
     var action: String
@@ -177,16 +167,14 @@ final class MaintenanceLogEntry {
     var waterChange: Bool
 
     init(
-        logDate: String,
-        logTime: String,
+        loggedAt: Date,
         createdAt: Date = .now,
         action: String = "",
         notes: String = "",
         filterChanged: Bool = false,
         waterChange: Bool = false
     ) {
-        self.logDate = logDate
-        self.logTime = logTime
+        self.loggedAt = loggedAt
         self.createdAt = createdAt
         self.action = action
         self.notes = notes
@@ -199,22 +187,19 @@ final class MaintenanceLogEntry {
 
 @Model
 final class UsageLogEntry {
-    var usageDate: String
-    var usageTime: String
+    var loggedAt: Date
     var createdAt: Date
 
     var numUsers: Int
     var durationMinutes: Int
 
     init(
-        usageDate: String,
-        usageTime: String,
+        loggedAt: Date,
         createdAt: Date = .now,
         numUsers: Int = 1,
         durationMinutes: Int = 15
     ) {
-        self.usageDate = usageDate
-        self.usageTime = usageTime
+        self.loggedAt = loggedAt
         self.createdAt = createdAt
         self.numUsers = numUsers
         self.durationMinutes = durationMinutes

@@ -17,8 +17,16 @@ enum FormValidation {
         return start > today
     }
 
+    /// True if the event’s calendar day is after today (local timezone).
+    static func isFutureLoggedDay(_ moment: Date) -> Bool {
+        let cal = Calendar.current
+        let eventDay = cal.startOfDay(for: moment)
+        let today = cal.startOfDay(for: Date())
+        return eventDay > today
+    }
+
     static func validateDailyLog(
-        logDate: String,
+        loggedAt: Date,
         ph: String,
         sanitizerFree: String,
         sanitizerCombined: String,
@@ -28,12 +36,12 @@ enum FormValidation {
         notes: String
     ) -> [String] {
         var errors: [String] = []
-        if isFutureDate(ymd: logDate) {
+        if isFutureLoggedDay(loggedAt) {
             errors.append("Cannot log data for a future date")
         }
         if let e = validateOptionalRange(ph, min: 0, max: 14, label: "pH") { errors.append(e) }
         if let e = validateOptionalRange(sanitizerFree, min: 0, max: 20, label: "Free sanitizer (ppm)") { errors.append(e) }
-        if let e = validateOptionalRange(sanitizerCombined, min: 0, max: 20, label: "Combined/total sanitizer") {
+        if let e = validateOptionalRange(sanitizerCombined, min: 0, max: 20, label: "Combined sanitizer") {
             errors.append(e)
         }
         if let e = validateOptionalNonNegative(addedSanitizer, label: "Added sanitizer") { errors.append(e) }
@@ -44,19 +52,23 @@ enum FormValidation {
     }
 
     static func validateWeekly(
-        logDate: String,
+        loggedAt: Date,
         combined: String,
         total: String,
         alkalinity: String,
         copper: String,
         shock: String,
         alkUp: String,
-        notes: String
+        notes: String,
+        waterClarity: String,
+        foamPresent: Bool
     ) -> [String] {
         var errors: [String] = []
-        if isFutureDate(ymd: logDate) {
+        if isFutureLoggedDay(loggedAt) {
             errors.append("Cannot log data for a future date")
         }
+        if let e = validateOptionalRange(combined, min: 0, max: 50, label: "Combined sanitizer (ppm)") { errors.append(e) }
+        if let e = validateOptionalRange(total, min: 0, max: 50, label: "Total sanitizer (ppm)") { errors.append(e) }
         if let e = validateOptionalRange(alkalinity, min: 0, max: 300, label: "Total alkalinity") { errors.append(e) }
         if let e = validateOptionalRange(copper, min: 0, max: 5, label: "Copper") { errors.append(e) }
         if let e = validateOptionalNonNegative(shock, label: "Shock added") { errors.append(e) }
@@ -70,6 +82,8 @@ enum FormValidation {
             || !shock.trimmingCharacters(in: .whitespaces).isEmpty
             || !alkUp.trimmingCharacters(in: .whitespaces).isEmpty
             || !notes.trimmingCharacters(in: .whitespaces).isEmpty
+            || !waterClarity.trimmingCharacters(in: .whitespaces).isEmpty
+            || foamPresent
 
         if !hasAny {
             errors.append("Enter at least one weekly check value or notes")
@@ -77,9 +91,9 @@ enum FormValidation {
         return errors
     }
 
-    static func validateMaintenance(logDate: String, action: String, waterChange: Bool, filterChanged: Bool) -> [String] {
+    static func validateMaintenance(loggedAt: Date, action: String, waterChange: Bool, filterChanged: Bool) -> [String] {
         var errors: [String] = []
-        if isFutureDate(ymd: logDate) {
+        if isFutureLoggedDay(loggedAt) {
             errors.append("Cannot log maintenance for a future date")
         }
         let trimmed = action.trimmingCharacters(in: .whitespaces)
@@ -89,8 +103,8 @@ enum FormValidation {
         return errors
     }
 
-    static func validateUsage(usageDate: String) -> [String] {
-        if isFutureDate(ymd: usageDate) {
+    static func validateUsage(loggedAt: Date) -> [String] {
+        if isFutureLoggedDay(loggedAt) {
             return ["Cannot log usage for a future date"]
         }
         return []

@@ -8,8 +8,10 @@
 import Foundation
 
 struct UsageRatePeriod: Sendable {
-    var periodStart: String
-    var periodEnd: String
+    /// Start of the local calendar day for the earlier reading in the pair.
+    var periodStart: Date
+    /// Start of the local calendar day for the later reading in the pair.
+    var periodEnd: Date
     var hoursElapsed: Double
     var daysElapsed: Double
     var ppmPerDay: Double
@@ -27,7 +29,8 @@ struct AverageRateResult: Sendable {
 
 struct DataConfidence: Sendable {
     var hasRecentWaterChange: Bool
-    var waterChangeDate: String?
+    /// Start of the local calendar day when water was last changed, if known.
+    var waterChangeDate: Date?
     var daysSinceWaterChange: Int?
     var readingsSinceWaterChange: Int
     var confidence: String
@@ -35,15 +38,23 @@ struct DataConfidence: Sendable {
 }
 
 enum RateCalculator {
-    private static func mostRecentWaterChangeDate(from maintenance: [MaintenanceLogEntry]) -> String? {
+    private static func startOfDay(_ date: Date, calendar: Calendar = .current) -> Date {
+        calendar.startOfDay(for: date)
+    }
+
+    private static func ymdString(_ date: Date, calendar: Calendar = .current) -> String {
+        let d = startOfDay(date, calendar: calendar)
+        let y = calendar.component(.year, from: d)
+        let m = calendar.component(.month, from: d)
+        let day = calendar.component(.day, from: d)
+        return String(format: "%04d-%02d-%02d", y, m, day)
+    }
+
+    private static func mostRecentWaterChangeDay(from maintenance: [MaintenanceLogEntry]) -> Date? {
         maintenance
             .filter(\.waterChange)
-            .sorted { a, b in
-                if a.logDate != b.logDate { return a.logDate > b.logDate }
-                return (a.logTime) > (b.logTime)
-            }
-            .first?
-            .logDate
+            .map { startOfDay($0.loggedAt) }
+            .max()
     }
 
     static func calculateUsageRates(
@@ -54,44 +65,43 @@ enum RateCalculator {
     ) -> [UsageRatePeriod] {
         guard logs.count >= 2 else { return [] }
 
-        let waterChangeDate = mostRecentWaterChangeDate(from: maintenanceLogs)
+        let waterChangeDay = mostRecentWaterChangeDay(from: maintenanceLogs)
+        let cal = Calendar.current
         let filtered: [HotTubDailyLog]
-        if let waterChangeDate {
-            filtered = logs.filter { $0.logDate > waterChangeDate }
+        if let waterChangeDay {
+            filtered = logs.filter { startOfDay($0.loggedAt, calendar: cal) > waterChangeDay }
         } else {
             filtered = logs
         }
         guard filtered.count >= 2 else { return [] }
 
-        let sortedLogs = filtered.sorted { a, b in
-            if a.logDate != b.logDate { return a.logDate < b.logDate }
-            return (a.logTime) < (b.logTime)
-        }
+        let sortedLogs = filtered.sorted { $0.loggedAt < $1.loggedAt }
 
         var rates: [UsageRatePeriod] = []
-        let cal = Calendar(identifier: .gregorian)
 
         for i in 1..<sortedLogs.count {
             let before = sortedLogs[i - 1]
             let after = sortedLogs[i]
-            guard let c1 = before.chlorine1, let c2 = after.chlorine1 else { continue }
+            guard let c1 = before.sanitizerFree, let c2 = after.sanitizerFree else { continue }
 
-            let beforeTime = dateFrom(logDate: before.logDate, logTime: before.logTime, calendar: cal)
-            let afterTime = dateFrom(logDate: after.logDate, logTime: after.logTime, calendar: cal)
-            guard let beforeTime, let afterTime else { continue }
+            let beforeTime = before.loggedAt
+            let afterTime = after.loggedAt
 
             let hoursElapsed = afterTime.timeIntervalSince(beforeTime) / 3600
             if hoursElapsed <= 0 { continue }
 
+            let beforeYmd = ymdString(beforeTime, calendar: cal)
+            let afterYmd = ymdString(afterTime, calendar: cal)
+
             let chlorineShockInPeriod = weeklyChecks.contains { check in
-                let d = check.logDate
-                return d >= before.logDate && d <= after.logDate
+                let d = ymdString(check.loggedAt, calendar: cal)
+                return d >= beforeYmd && d <= afterYmd
                     && (check.shockAdded ?? 0) > 0
                     && ShockTypes.isSanitizerAddingShock(check.shockType)
             }
 
             let ppmChange = c1 - c2
-            let ppmAdded = after.addedChlorine
+            let ppmAdded = after.addedSanitizer
             let totalConsumed = ppmChange + ppmAdded
             let ppmPerHour = totalConsumed / hoursElapsed
             let ppmPerDay = ppmPerHour * 24
@@ -99,8 +109,8 @@ enum RateCalculator {
 
             rates.append(
                 UsageRatePeriod(
-                    periodStart: before.logDate,
-                    periodEnd: after.logDate,
+                    periodStart: startOfDay(beforeTime, calendar: cal),
+                    periodEnd: startOfDay(afterTime, calendar: cal),
                     hoursElapsed: (hoursElapsed * 10).rounded() / 10,
                     daysElapsed: ((hoursElapsed / 24) * 10).rounded() / 10,
                     ppmPerDay: (ppmPerDay * 100).rounded() / 100,
@@ -113,24 +123,6 @@ enum RateCalculator {
             )
         }
         return rates
-    }
-
-    private static func dateFrom(logDate: String, logTime: String, calendar: Calendar) -> Date? {
-        let t = logTime.count >= 5 ? String(logTime.prefix(5)) : logTime
-        return parseFallback(date: logDate, time: t, calendar: calendar)
-    }
-
-    private static func parseFallback(date: String, time: String, calendar: Calendar) -> Date? {
-        var dc = DateComponents()
-        let dp = date.split(separator: "-").compactMap { Int($0) }
-        guard dp.count == 3 else { return nil }
-        dc.year = dp[0]
-        dc.month = dp[1]
-        dc.day = dp[2]
-        let tp = time.split(separator: ":").compactMap { Int($0) }
-        dc.hour = tp.first ?? 0
-        dc.minute = tp.count > 1 ? tp[1] : 0
-        return calendar.date(from: dc)
     }
 
     static func getCurrentRate(
@@ -164,14 +156,11 @@ enum RateCalculator {
         )
         guard !rates.isEmpty else { return nil }
 
-        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        let cutoffStr = f.string(from: cutoff)
+        let cal = Calendar.current
+        let cutoff = cal.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        let cutoffDay = startOfDay(cutoff, calendar: cal)
 
-        let recent = rates.filter { $0.periodEnd >= cutoffStr && !$0.excludedFromCalc }
+        let recent = rates.filter { $0.periodEnd >= cutoffDay && !$0.excludedFromCalc }
         guard !recent.isEmpty else { return nil }
 
         let avgPpm = recent.map(\.ppmPerDay).reduce(0, +) / Double(recent.count)
@@ -188,9 +177,9 @@ enum RateCalculator {
         logs: [HotTubDailyLog],
         maintenanceLogs: [MaintenanceLogEntry]
     ) -> DataConfidence {
-        let waterChangeDate = mostRecentWaterChangeDate(from: maintenanceLogs)
+        let waterChangeDay = mostRecentWaterChangeDay(from: maintenanceLogs)
 
-        guard let waterChangeDate else {
+        guard let waterChangeDay else {
             let n = logs.count
             let conf: String
             if n >= 7 { conf = "high" }
@@ -206,14 +195,9 @@ enum RateCalculator {
             )
         }
 
-        let logsAfter = logs.filter { $0.logDate > waterChangeDate }
-        let wcDate = parseDateOnly(waterChangeDate)
-        let daysSince: Int
-        if let wcDate {
-            daysSince = Calendar.current.dateComponents([.day], from: wcDate, to: Date()).day ?? 0
-        } else {
-            daysSince = 0
-        }
+        let cal = Calendar.current
+        let logsAfter = logs.filter { startOfDay($0.loggedAt, calendar: cal) > waterChangeDay }
+        let daysSince = cal.dateComponents([.day], from: waterChangeDay, to: startOfDay(Date(), calendar: cal)).day ?? 0
 
         var confidence = "low"
         var warning: String?
@@ -230,19 +214,11 @@ enum RateCalculator {
 
         return DataConfidence(
             hasRecentWaterChange: true,
-            waterChangeDate: waterChangeDate,
+            waterChangeDate: waterChangeDay,
             daysSinceWaterChange: daysSince,
             readingsSinceWaterChange: logsAfter.count,
             confidence: confidence,
             warningMessage: warning
         )
-    }
-
-    private static func parseDateOnly(_ ymd: String) -> Date? {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.date(from: ymd)
     }
 }

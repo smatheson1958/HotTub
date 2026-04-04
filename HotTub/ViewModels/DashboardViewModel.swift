@@ -23,12 +23,21 @@ enum DashboardActivity: Identifiable {
         }
     }
 
-    var sortKey: (String, String) {
+    var sortMoment: Date {
         switch self {
-        case .daily(let x): return (x.logDate, x.logTime)
-        case .weekly(let x): return (x.logDate, x.logTime)
-        case .maintenance(let x): return (x.logDate, x.logTime)
-        case .usage(let x): return (x.usageDate, x.usageTime)
+        case .daily(let x): return x.loggedAt
+        case .weekly(let x): return x.loggedAt
+        case .maintenance(let x): return x.loggedAt
+        case .usage(let x): return x.loggedAt
+        }
+    }
+
+    var createdAtMoment: Date {
+        switch self {
+        case .daily(let x): return x.createdAt
+        case .weekly(let x): return x.createdAt
+        case .maintenance(let x): return x.createdAt
+        case .usage(let x): return x.createdAt
         }
     }
 
@@ -73,10 +82,7 @@ final class DashboardViewModel: ObservableObject {
         let settingsList = (try? context.fetch(FetchDescriptor<AppSettings>())) ?? []
         let settings = settingsList.first
 
-        let sortedDaily = daily.sorted { a, b in
-            if a.logDate != b.logDate { return a.logDate > b.logDate }
-            return a.logTime > b.logTime
-        }
+        let sortedDaily = daily.sorted { $0.loggedAt > $1.loggedAt }
         latestDailyLog = sortedDaily.first
 
         volumeLitres = settings?.volumeLitres ?? 1000
@@ -91,18 +97,12 @@ final class DashboardViewModel: ObservableObject {
         combined.append(contentsOf: usage.map { .usage($0) })
 
         combined.sort { a, b in
-            let ka = a.sortKey
-            let kb = b.sortKey
-            if ka.0 != kb.0 { return ka.0 > kb.0 }
-            if ka.1 != kb.1 { return ka.1 > kb.1 }
-            return false
+            if a.sortMoment != b.sortMoment { return a.sortMoment > b.sortMoment }
+            return a.createdAtMoment > b.createdAtMoment
         }
         recentActivity = Array(combined.prefix(4))
 
-        let sortedDailyAsc = daily.sorted { a, b in
-            if a.logDate != b.logDate { return a.logDate < b.logDate }
-            return a.logTime < b.logTime
-        }
+        let sortedDailyAsc = daily.sorted { $0.loggedAt < $1.loggedAt }
 
         currentRate = RateCalculator.getCurrentRate(
             logs: sortedDailyAsc,

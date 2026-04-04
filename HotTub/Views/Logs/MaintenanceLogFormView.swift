@@ -13,8 +13,7 @@ struct MaintenanceLogFormView: View {
 
     let existing: MaintenanceLogEntry?
 
-    @State private var logDate = LogFormFormatting.todayYMD()
-    @State private var logTime = LogFormFormatting.nowHM()
+    @State private var loggedAt: Date = .now
     @State private var action = ""
     @State private var notes = ""
     @State private var filterChanged = false
@@ -30,8 +29,7 @@ struct MaintenanceLogFormView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Date (yyyy-MM-dd)", text: $logDate)
-                TextField("Time (HH:mm)", text: $logTime)
+                DatePicker("Date & time", selection: $loggedAt, displayedComponents: [.date, .hourAndMinute])
             } header: {
                 Text("When")
             }
@@ -67,8 +65,7 @@ struct MaintenanceLogFormView: View {
         .onAppear {
             HotTubModelContainer.seedIfNeeded(in: modelContext)
             if let e = existing {
-                logDate = e.logDate
-                logTime = String(e.logTime.prefix(5))
+                loggedAt = e.loggedAt
                 action = e.action
                 notes = e.notes
                 filterChanged = e.filterChanged
@@ -92,7 +89,7 @@ struct MaintenanceLogFormView: View {
         }
 
         let errs = FormValidation.validateMaintenance(
-            logDate: logDate,
+            loggedAt: loggedAt,
             action: finalAction,
             waterChange: waterChange,
             filterChanged: filterChanged
@@ -104,16 +101,14 @@ struct MaintenanceLogFormView: View {
         }
 
         if let e = existing {
-            e.logDate = logDate
-            e.logTime = logTime.count == 5 ? "\(logTime):00" : logTime
+            e.loggedAt = loggedAt
             e.action = finalAction
             e.notes = notes
             e.filterChanged = filterChanged
             e.waterChange = waterChange
         } else {
             let log = MaintenanceLogEntry(
-                logDate: logDate,
-                logTime: logTime.count == 5 ? "\(logTime):00" : logTime,
+                loggedAt: loggedAt,
                 action: finalAction,
                 notes: notes,
                 filterChanged: filterChanged,

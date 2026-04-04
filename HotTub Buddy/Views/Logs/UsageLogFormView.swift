@@ -13,8 +13,7 @@ struct UsageLogFormView: View {
 
     let existing: UsageLogEntry?
 
-    @State private var usageDate = LogFormFormatting.todayYMD()
-    @State private var usageTime = LogFormFormatting.nowHM()
+    @State private var loggedAt: Date = .now
     @State private var numUsers = 1
     @State private var durationMinutes = 15
 
@@ -28,8 +27,7 @@ struct UsageLogFormView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Date (yyyy-MM-dd)", text: $usageDate)
-                TextField("Time (HH:mm)", text: $usageTime)
+                DatePicker("Date & time", selection: $loggedAt, displayedComponents: [.date, .hourAndMinute])
             } header: {
                 Text("When")
             }
@@ -58,8 +56,7 @@ struct UsageLogFormView: View {
         .onAppear {
             HotTubModelContainer.seedIfNeeded(in: modelContext)
             if let e = existing {
-                usageDate = e.usageDate
-                usageTime = String(e.usageTime.prefix(5))
+                loggedAt = e.loggedAt
                 numUsers = e.numUsers
                 durationMinutes = e.durationMinutes
             }
@@ -72,24 +69,20 @@ struct UsageLogFormView: View {
     }
 
     private func save() {
-        let errs = FormValidation.validateUsage(usageDate: usageDate)
+        let errs = FormValidation.validateUsage(loggedAt: loggedAt)
         if !errs.isEmpty {
             alertMessage = errs.joined(separator: "\n")
             showAlert = true
             return
         }
 
-        let t = usageTime.count == 5 ? "\(usageTime):00" : usageTime
-
         if let e = existing {
-            e.usageDate = usageDate
-            e.usageTime = t
+            e.loggedAt = loggedAt
             e.numUsers = numUsers
             e.durationMinutes = durationMinutes
         } else {
             let log = UsageLogEntry(
-                usageDate: usageDate,
-                usageTime: t,
+                loggedAt: loggedAt,
                 numUsers: numUsers,
                 durationMinutes: durationMinutes
             )

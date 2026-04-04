@@ -10,10 +10,10 @@ struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appPalette) private var palette
 
-    @Query(sort: \HotTubDailyLog.logDate, order: .reverse) private var dailyLogs: [HotTubDailyLog]
-    @Query(sort: \WeeklyCheckLog.logDate, order: .reverse) private var weeklyLogs: [WeeklyCheckLog]
-    @Query(sort: \MaintenanceLogEntry.logDate, order: .reverse) private var maintenanceLogs: [MaintenanceLogEntry]
-    @Query(sort: \UsageLogEntry.usageDate, order: .reverse) private var usageLogs: [UsageLogEntry]
+    @Query(sort: \HotTubDailyLog.loggedAt, order: .reverse) private var dailyLogs: [HotTubDailyLog]
+    @Query(sort: \WeeklyCheckLog.loggedAt, order: .reverse) private var weeklyLogs: [WeeklyCheckLog]
+    @Query(sort: \MaintenanceLogEntry.loggedAt, order: .reverse) private var maintenanceLogs: [MaintenanceLogEntry]
+    @Query(sort: \UsageLogEntry.loggedAt, order: .reverse) private var usageLogs: [UsageLogEntry]
     @Query private var settingsRows: [AppSettings]
 
     @State private var filterDaily = true
@@ -35,10 +35,7 @@ struct HistoryView: View {
         if filterUsage { rows.append(contentsOf: usageLogs.map { .usage($0) }) }
 
         return rows.sorted { a, b in
-            let ka = a.sortKey
-            let kb = b.sortKey
-            if ka.0 != kb.0 { return ka.0 > kb.0 }
-            if ka.1 != kb.1 { return ka.1 > kb.1 }
+            if a.sortMoment != b.sortMoment { return a.sortMoment > b.sortMoment }
             return a.createdAt > b.createdAt
         }
     }
@@ -150,8 +147,6 @@ struct HistoryView: View {
     }
 }
 
-// MARK: - Row model
-
 enum HistoryRow: Identifiable {
     case daily(HotTubDailyLog)
     case weekly(WeeklyCheckLog)
@@ -167,12 +162,12 @@ enum HistoryRow: Identifiable {
         }
     }
 
-    var sortKey: (String, String) {
+    var sortMoment: Date {
         switch self {
-        case .daily(let x): return (x.logDate, x.logTime)
-        case .weekly(let x): return (x.logDate, x.logTime)
-        case .maintenance(let x): return (x.logDate, x.logTime)
-        case .usage(let x): return (x.usageDate, x.usageTime)
+        case .daily(let x): return x.loggedAt
+        case .weekly(let x): return x.loggedAt
+        case .maintenance(let x): return x.loggedAt
+        case .usage(let x): return x.loggedAt
         }
     }
 
@@ -213,10 +208,8 @@ private struct HistoryRowView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(palette.color(.textPrimary))
                 HStack(spacing: 8) {
-                    Text(formatDate(datePart))
-                    if let t = timePart {
-                        Text(t)
-                    }
+                    Text(formatShortDate(row.sortMoment))
+                    Text(timeString(row.sortMoment))
                 }
                 .font(.caption)
                 .foregroundStyle(palette.color(.textSecondary))
@@ -258,34 +251,17 @@ private struct HistoryRowView: View {
         }
     }
 
-    private var datePart: String {
-        switch row {
-        case .daily(let x): return x.logDate
-        case .weekly(let x): return x.logDate
-        case .maintenance(let x): return x.logDate
-        case .usage(let x): return x.usageDate
-        }
+    private func formatShortDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "dd MMM yy"
+        return f.string(from: date)
     }
 
-    private var timePart: String? {
-        let raw: String
-        switch row {
-        case .daily(let x): raw = x.logTime
-        case .weekly(let x): raw = x.logTime
-        case .maintenance(let x): raw = x.logTime
-        case .usage(let x): raw = x.usageTime
-        }
-        return String(raw.prefix(5))
-    }
-
-    private func formatDate(_ ymd: String) -> String {
-        let fIn = DateFormatter()
-        fIn.locale = Locale(identifier: "en_US_POSIX")
-        fIn.dateFormat = "yyyy-MM-dd"
-        guard let d = fIn.date(from: ymd) else { return ymd }
-        let fOut = DateFormatter()
-        fOut.dateFormat = "dd MMM yy"
-        return fOut.string(from: d)
+    private func timeString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
     }
 
     private func phWarning(_ log: HotTubDailyLog) -> Bool {

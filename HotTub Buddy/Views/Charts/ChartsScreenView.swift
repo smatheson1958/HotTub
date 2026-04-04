@@ -24,8 +24,8 @@ struct ChartsScreenView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appPalette) private var palette
 
-    @Query(sort: \HotTubDailyLog.logDate, order: .forward) private var allDaily: [HotTubDailyLog]
-    @Query(sort: \UsageLogEntry.usageDate, order: .forward) private var allUsage: [UsageLogEntry]
+    @Query(sort: \HotTubDailyLog.loggedAt, order: .forward) private var allDaily: [HotTubDailyLog]
+    @Query(sort: \UsageLogEntry.loggedAt, order: .forward) private var allUsage: [UsageLogEntry]
     @Query private var settingsRows: [AppSettings]
 
     @State private var viewMonth: Date = Date()
@@ -43,32 +43,27 @@ struct ChartsScreenView: View {
         return f.string(from: viewMonth)
     }
 
-    private var monthBounds: (start: String, end: String) {
-        let cal = Calendar.current
-        let comps = cal.dateComponents([.year, .month], from: viewMonth)
-        let start = cal.date(from: comps)!
-        let end = cal.date(byAdding: DateComponents(month: 1, day: -1), to: start)!
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.dateFormat = "yyyy-MM-dd"
-        return (df.string(from: start), df.string(from: end))
-    }
-
     private var logsInMonth: [HotTubDailyLog] {
-        let b = monthBounds
-        return allDaily.filter { $0.logDate >= b.start && $0.logDate <= b.end }
-            .sorted { $0.logDate < $1.logDate || ($0.logDate == $1.logDate && $0.logTime < $1.logTime) }
+        let cal = Calendar.current
+        return allDaily.filter { cal.isDate($0.loggedAt, equalTo: viewMonth, toGranularity: .month) }
+            .sorted { $0.loggedAt < $1.loggedAt }
     }
 
     private var usageInMonth: [UsageLogEntry] {
-        let b = monthBounds
-        return allUsage.filter { $0.usageDate >= b.start && $0.usageDate <= b.end }
+        let cal = Calendar.current
+        return allUsage.filter { cal.isDate($0.loggedAt, equalTo: viewMonth, toGranularity: .month) }
     }
 
     private var userCountByDay: [String: Int] {
         var m: [String: Int] = [:]
+        let cal = Calendar.current
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
         for u in usageInMonth {
-            m[u.usageDate, default: 0] += u.numUsers
+            let day = cal.startOfDay(for: u.loggedAt)
+            let k = df.string(from: day)
+            m[k, default: 0] += u.numUsers
         }
         return m
     }
@@ -181,9 +176,11 @@ struct ChartsScreenView: View {
     }
 
     private var phChart: some View {
+        let cal = Calendar.current
         let marks: [ChartPoint] = logsInMonth.compactMap { log in
-            guard let ph = log.ph, let d = parseDate(log.logDate) else { return nil }
-            return ChartPoint(id: log.persistentModelID, day: d, value: ph)
+            guard let ph = log.ph else { return nil }
+            let day = cal.startOfDay(for: log.loggedAt)
+            return ChartPoint(id: log.persistentModelID, day: day, value: ph)
         }
         return chartCard(title: "pH") {
             if marks.isEmpty {
@@ -213,9 +210,11 @@ struct ChartsScreenView: View {
     }
 
     private var sanitizerChart: some View {
+        let cal = Calendar.current
         let marks: [ChartPoint] = logsInMonth.compactMap { log in
-            guard let ppm = log.primarySanitizerPpm, let d = parseDate(log.logDate) else { return nil }
-            return ChartPoint(id: log.persistentModelID, day: d, value: ppm)
+            guard let ppm = log.primarySanitizerPpm else { return nil }
+            let day = cal.startOfDay(for: log.loggedAt)
+            return ChartPoint(id: log.persistentModelID, day: day, value: ppm)
         }
         let title = isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)"
         return chartCard(title: title) {
@@ -246,7 +245,7 @@ struct ChartsScreenView: View {
 
     private var usersChart: some View {
         let barPoints: [UserBarPoint] = userCountByDay.keys.sorted().compactMap { k in
-            guard let d = parseDate(k), let n = userCountByDay[k] else { return nil }
+            guard let d = parseYMD(k), let n = userCountByDay[k] else { return nil }
             return UserBarPoint(id: k, day: d, count: n)
         }
         return chartCard(title: "Users per day") {
@@ -332,7 +331,7 @@ struct ChartsScreenView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private func parseDate(_ ymd: String) -> Date? {
+    private func parseYMD(_ ymd: String) -> Date? {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"

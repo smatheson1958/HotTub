@@ -13,8 +13,7 @@ struct DailyLogFormView: View {
 
     let existing: HotTubDailyLog?
 
-    @State private var logDate: String = LogFormFormatting.todayYMD()
-    @State private var logTime: String = LogFormFormatting.nowHM()
+    @State private var loggedAt: Date = .now
     @State private var waterTemp: Int = 37
     @State private var ph: String = ""
     @State private var sanitizerFree: String = ""
@@ -39,11 +38,7 @@ struct DailyLogFormView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Date (yyyy-MM-dd)", text: $logDate)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                TextField("Time (HH:mm)", text: $logTime)
-                    .textInputAutocapitalization(.never)
+                DatePicker("Date & time", selection: $loggedAt, displayedComponents: [.date, .hourAndMinute])
             } header: {
                 Text("When")
             }
@@ -64,7 +59,7 @@ struct DailyLogFormView: View {
                     .keyboardType(.decimalPad)
                 TextField(isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)", text: $sanitizerFree)
                     .keyboardType(.decimalPad)
-                TextField("Combined / total (optional)", text: $sanitizerCombined)
+                TextField("Combined sanitizer (optional)", text: $sanitizerCombined)
                     .keyboardType(.decimalPad)
             } header: {
                 Text("Readings")
@@ -103,12 +98,11 @@ struct DailyLogFormView: View {
         .onAppear {
             HotTubModelContainer.seedIfNeeded(in: modelContext)
             if let e = existing {
-                logDate = e.logDate
-                logTime = String(e.logTime.prefix(5))
+                loggedAt = e.loggedAt
                 if let t = e.waterTemperature { waterTemp = t }
                 ph = e.ph.map { String(format: "%g", $0) } ?? ""
                 sanitizerFree = e.sanitizerFree.map { String(format: "%g", $0) } ?? ""
-                sanitizerCombined = e.sanitizerCombinedOrTotal.map { String(format: "%g", $0) } ?? ""
+                sanitizerCombined = e.sanitizerCombined.map { String(format: "%g", $0) } ?? ""
                 addedSanitizer = e.addedSanitizer > 0 ? String(format: "%g", e.addedSanitizer) : ""
                 addedPhUp = e.addedPhUp > 0 ? String(format: "%g", e.addedPhUp) : ""
                 addedPhDown = e.addedPhDown > 0 ? String(format: "%g", e.addedPhDown) : ""
@@ -130,7 +124,7 @@ struct DailyLogFormView: View {
 
     private func save() {
         let errs = FormValidation.validateDailyLog(
-            logDate: logDate,
+            loggedAt: loggedAt,
             ph: ph,
             sanitizerFree: sanitizerFree,
             sanitizerCombined: sanitizerCombined,
@@ -153,16 +147,11 @@ struct DailyLogFormView: View {
             apply(to: e, phVal: phVal, freeVal: freeVal, combVal: combVal)
         } else {
             let log = HotTubDailyLog(
-                logDate: logDate,
-                logTime: logTime.count == 5 ? "\(logTime):00" : logTime,
+                loggedAt: loggedAt,
                 waterTemperature: waterTemp,
                 ph: phVal,
                 sanitizerFree: freeVal,
-                sanitizerCombinedOrTotal: combVal,
-                chlorine1: freeVal,
-                chlorine2: nil,
-                chlorine3: combVal,
-                addedChlorine: Double(addedSanitizer) ?? 0,
+                sanitizerCombined: combVal,
                 addedPhUp: Double(addedPhUp) ?? 0,
                 addedPhDown: Double(addedPhDown) ?? 0,
                 addedSanitizer: Double(addedSanitizer) ?? 0,
@@ -175,15 +164,11 @@ struct DailyLogFormView: View {
     }
 
     private func apply(to e: HotTubDailyLog, phVal: Double?, freeVal: Double?, combVal: Double?) {
-        e.logDate = logDate
-        e.logTime = logTime.count == 5 ? "\(logTime):00" : logTime
+        e.loggedAt = loggedAt
         e.waterTemperature = waterTemp
         e.ph = phVal
         e.sanitizerFree = freeVal
-        e.sanitizerCombinedOrTotal = combVal
-        e.chlorine1 = freeVal
-        e.chlorine3 = combVal
-        e.addedChlorine = Double(addedSanitizer) ?? 0
+        e.sanitizerCombined = combVal
         e.addedPhUp = Double(addedPhUp) ?? 0
         e.addedPhDown = Double(addedPhDown) ?? 0
         e.addedSanitizer = Double(addedSanitizer) ?? 0

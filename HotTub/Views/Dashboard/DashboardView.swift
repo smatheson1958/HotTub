@@ -71,7 +71,7 @@ struct DashboardView: View {
 
                 Spacer()
                 Text(
-                    log.map { "Last checked: \(formatShortDate($0.logDate))" } ?? "No records yet"
+                    log.map { "Last checked: \(formatShortDate($0.loggedAt))" } ?? "No records yet"
                 )
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(palette.color(.onAccent))
@@ -343,10 +343,8 @@ struct DashboardView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(palette.color(.textPrimary))
                     HStack(spacing: 12) {
-                        Label(formatShortDate(dateString(item)), systemImage: "calendar")
-                        if let t = timeString(item), !t.isEmpty {
-                            Label(t, systemImage: "clock")
-                        }
+                        Label(formatShortDate(moment(for: item)), systemImage: "calendar")
+                        Label(timeHM(moment(for: item)), systemImage: "clock")
                     }
                     .font(.caption)
                     .foregroundStyle(palette.color(.textSecondary))
@@ -399,32 +397,26 @@ struct DashboardView: View {
         }
     }
 
-    private func dateString(_ item: DashboardActivity) -> String {
+    private func moment(for item: DashboardActivity) -> Date {
         switch item {
-        case .daily(let x): return x.logDate
-        case .weekly(let x): return x.logDate
-        case .maintenance(let x): return x.logDate
-        case .usage(let x): return x.usageDate
+        case .daily(let x): return x.loggedAt
+        case .weekly(let x): return x.loggedAt
+        case .maintenance(let x): return x.loggedAt
+        case .usage(let x): return x.loggedAt
         }
     }
 
-    private func timeString(_ item: DashboardActivity) -> String? {
-        switch item {
-        case .daily(let x): return String(x.logTime.prefix(5))
-        case .weekly(let x): return String(x.logTime.prefix(5))
-        case .maintenance(let x): return String(x.logTime.prefix(5))
-        case .usage(let x): return String(x.usageTime.prefix(5))
-        }
+    private func formatShortDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "dd MMM yy"
+        return f.string(from: date)
     }
 
-    private func formatShortDate(_ ymd: String) -> String {
-        let fIn = DateFormatter()
-        fIn.locale = Locale(identifier: "en_US_POSIX")
-        fIn.dateFormat = "yyyy-MM-dd"
-        guard let d = fIn.date(from: ymd) else { return ymd }
-        let fOut = DateFormatter()
-        fOut.dateFormat = "dd MMM yy"
-        return fOut.string(from: d)
+    private func timeHM(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
     }
 
     private func formatGrams(_ v: Double) -> String {

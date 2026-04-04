@@ -52,15 +52,22 @@ private func seedPreviewSampleDailyLogs(into context: ModelContext) {
         (27, 7.48, 2.1, "07:30:00"),
     ]
 
+    let cal = Calendar.current
     for (day, ph, chlorine, time) in rows {
-        let monthDay = String(format: "%04d-03-%02d", year, day)
+        let tp = time.split(separator: ":").compactMap { Int($0) }
+        var dc = DateComponents()
+        dc.year = year
+        dc.month = 3
+        dc.day = day
+        dc.hour = tp.first ?? 0
+        dc.minute = tp.count > 1 ? tp[1] : 0
+        dc.second = tp.count > 2 ? tp[2] : 0
+        guard let loggedAt = cal.date(from: dc) else { continue }
         let log = HotTubDailyLog(
-            logDate: monthDay,
-            logTime: time,
+            loggedAt: loggedAt,
             waterTemperature: 37,
             ph: ph,
             sanitizerFree: chlorine,
-            chlorine1: chlorine,
             notes: previewSampleDailyLogNote
         )
         context.insert(log)
