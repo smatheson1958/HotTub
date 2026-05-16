@@ -78,15 +78,22 @@ struct ChartsScreenView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
+            VStack(alignment: .leading, spacing: AppSpacing.section) {
                 monthNav
                 toggles
 
                 if !chemicalOn && !showUsers {
-                    emptyCard("Turn on at least one chart layer.")
+                    AppEmptyState(
+                        symbol: "chart.xyaxis.line",
+                        title: "No layers selected",
+                        message: "Turn on at least one chart layer to see trends."
+                    )
                 } else if !hasData {
-                    emptyCard("No daily logs or usage in \(monthLabel).")
+                    AppEmptyState(
+                        symbol: "calendar",
+                        title: "No data this month",
+                        message: "No daily logs or usage entries in \(monthLabel)."
+                    )
                 } else {
                     if showPH {
                         phChart
@@ -100,24 +107,14 @@ struct ChartsScreenView: View {
                     guideSection
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 32)
+            .padding(.horizontal, AppSpacing.screenHorizontal)
+            .padding(.top, AppSpacing.screenTop)
+            .padding(.bottom, AppSpacing.screenBottom)
         }
-        .background(palette.color(.backgroundSecondary))
+        .appGroupedScreenBackground(palette)
         .navigationTitle("Charts")
+        .navigationBarTitleDisplayMode(.large)
         .onAppear { HotTubModelContainer.seedIfNeeded(in: modelContext) }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Analytics")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(palette.color(.textSecondary))
-            Text("Water quality trends")
-                .font(.title.bold())
-                .foregroundStyle(palette.color(.textPrimary))
-        }
-        .padding(.top, 8)
     }
 
     private var monthNav: some View {
@@ -296,39 +293,17 @@ struct ChartsScreenView: View {
                 .font(.caption)
                 .foregroundStyle(palette.color(.textSecondary))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(palette.color(.surfaceCard))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(palette.color(.separator).opacity(0.6), lineWidth: 1)
-        )
+        .appCard(palette: palette)
     }
 
     private func chartCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppSpacing.control) {
             Text(title)
                 .font(.headline)
+                .foregroundStyle(palette.color(.textPrimary))
             content()
         }
-        .padding(16)
-        .background(palette.color(.surfaceCard))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(palette.color(.separator).opacity(0.6), lineWidth: 1)
-        )
-    }
-
-    private func emptyCard(_ message: String) -> some View {
-        Text(message)
-            .font(.subheadline)
-            .foregroundStyle(palette.color(.textSecondary))
-            .frame(maxWidth: .infinity)
-            .padding(24)
-            .background(palette.color(.surfaceCard))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .appCard(palette: palette, radius: AppSpacing.largeCardRadius)
     }
 
     private func parseYMD(_ ymd: String) -> Date? {

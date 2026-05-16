@@ -51,6 +51,11 @@ final class AppSettings {
     var isBromine: Bool {
         sanitizerType.lowercased() == "bromine"
     }
+
+    /// User-facing name for the selected sanitizer (Chlorine / Bromine).
+    var sanitizerDisplayName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
 }
 
 // MARK: - Daily hot tub log

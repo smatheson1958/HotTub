@@ -41,36 +41,31 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            filterChips
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.section) {
+                filterChips
 
-            if combinedRows.isEmpty {
-                emptyState
-            } else {
-                List {
-                    ForEach(combinedRows) { row in
-                        NavigationLink {
-                            destination(for: row)
-                        } label: {
-                            HistoryRowView(row: row, isBromine: isBromine, palette: palette)
-                        }
-                        .listRowBackground(palette.color(.surfaceCard))
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                deleteTarget = row
-                                showDeleteConfirm = true
-                            } label: {
-                                Label("Delete", systemImage: "trash.fill")
-                            }
+                if combinedRows.isEmpty {
+                    AppEmptyState(
+                        symbol: "tray",
+                        title: "No entries",
+                        message: "Try turning on more filters, or add a log from Activity on the dashboard."
+                    )
+                } else {
+                    LazyVStack(spacing: AppSpacing.control) {
+                        ForEach(combinedRows) { row in
+                            historyRowLink(row)
                         }
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
             }
+            .padding(.horizontal, AppSpacing.screenHorizontal)
+            .padding(.top, AppSpacing.screenTop)
+            .padding(.bottom, AppSpacing.screenBottom)
         }
-        .background(palette.color(.backgroundSecondary))
+        .appGroupedScreenBackground(palette)
         .navigationTitle("History")
+        .navigationBarTitleDisplayMode(.large)
         .onAppear { HotTubModelContainer.seedIfNeeded(in: modelContext) }
         .confirmationDialog("Delete this record?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
@@ -84,45 +79,31 @@ struct HistoryView: View {
 
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip("Daily", on: $filterDaily)
-                chip("Weekly", on: $filterWeekly)
-                chip("Maintenance", on: $filterMaintenance)
-                chip("Usage", on: $filterUsage)
+            HStack(spacing: AppSpacing.control) {
+                AppFilterChip(title: "Daily", isOn: $filterDaily)
+                AppFilterChip(title: "Weekly", isOn: $filterWeekly)
+                AppFilterChip(title: "Maintenance", isOn: $filterMaintenance)
+                AppFilterChip(title: "Usage", isOn: $filterUsage)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
         }
     }
 
-    private func chip(_ title: String, on: Binding<Bool>) -> some View {
-        Button {
-            on.wrappedValue.toggle()
+    private func historyRowLink(_ row: HistoryRow) -> some View {
+        NavigationLink {
+            destination(for: row)
         } label: {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(on.wrappedValue ? palette.color(.tagBlueFill) : palette.color(.surfaceCard))
-                .foregroundStyle(on.wrappedValue ? palette.color(.accentBlue) : palette.color(.textSecondary))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().strokeBorder(palette.color(.separator), lineWidth: 1)
-                )
+            HistoryRowView(row: row, isBromine: isBromine, palette: palette)
+                .appCard(palette: palette, padding: 12)
         }
         .buttonStyle(.plain)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "tray")
-                .font(.largeTitle)
-                .foregroundStyle(palette.color(.textTertiary))
-            Text("No entries match these filters")
-                .font(.subheadline)
-                .foregroundStyle(palette.color(.textSecondary))
+        .contextMenu {
+            Button(role: .destructive) {
+                deleteTarget = row
+                showDeleteConfirm = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -182,10 +163,10 @@ enum HistoryRow: Identifiable {
 
     var title: String {
         switch self {
-        case .daily: return "Daily Log"
-        case .weekly: return "Weekly Check"
+        case .daily: return "Daily log"
+        case .weekly: return "Weekly check"
         case .maintenance(let x): return x.action.isEmpty ? "Maintenance" : x.action
-        case .usage: return "Hot Tub Usage"
+        case .usage: return "Hot tub usage"
         }
     }
 }
@@ -196,12 +177,13 @@ private struct HistoryRowView: View {
     let palette: AppPalette
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: AppSpacing.control) {
             Image(systemName: icon)
+                .font(.body.weight(.semibold))
                 .foregroundStyle(accent)
-                .frame(width: 36, height: 36)
+                .frame(width: 40, height: 40)
                 .background(accent.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.title)
@@ -218,20 +200,22 @@ private struct HistoryRowView: View {
                     HStack(spacing: 10) {
                         if let ph = log.ph {
                             Text("pH \(String(format: "%.1f", ph))")
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundStyle(phWarning(log) ? palette.color(.accentOrange) : palette.color(.textTertiary))
                         }
                         if let ppm = log.primarySanitizerPpm {
                             Text("\(isBromine ? "BR" : "FC") \(String(format: "%.1f", ppm))")
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundStyle(sanitizerWarning(log) ? palette.color(.accentOrange) : palette.color(.textTertiary))
                         }
                     }
                 }
             }
-            Spacer()
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(palette.color(.textTertiary))
         }
-        .padding(.vertical, 4)
     }
 
     private var icon: String {

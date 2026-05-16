@@ -33,18 +33,21 @@ enum FormValidation {
         addedSanitizer: String,
         addedPhUp: String,
         addedPhDown: String,
-        notes: String
+        notes: String,
+        isBromine: Bool
     ) -> [String] {
+        let sanitizerName = isBromine ? "Bromine" : "Chlorine"
         var errors: [String] = []
         if isFutureLoggedDay(loggedAt) {
             errors.append("Cannot log data for a future date")
         }
         if let e = validateOptionalRange(ph, min: 0, max: 14, label: "pH") { errors.append(e) }
-        if let e = validateOptionalRange(sanitizerFree, min: 0, max: 20, label: "Free sanitizer (ppm)") { errors.append(e) }
-        if let e = validateOptionalRange(sanitizerCombined, min: 0, max: 20, label: "Combined sanitizer") {
+        let freeLabel = isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)"
+        if let e = validateOptionalRange(sanitizerFree, min: 0, max: 20, label: freeLabel) { errors.append(e) }
+        if let e = validateOptionalRange(sanitizerCombined, min: 0, max: 20, label: "\(sanitizerName) combined") {
             errors.append(e)
         }
-        if let e = validateOptionalNonNegative(addedSanitizer, label: "Added sanitizer") { errors.append(e) }
+        if let e = validateOptionalNonNegative(addedSanitizer, label: "\(sanitizerName) added") { errors.append(e) }
         if let e = validateOptionalNonNegative(addedPhUp, label: "pH Up") { errors.append(e) }
         if let e = validateOptionalNonNegative(addedPhDown, label: "pH Down") { errors.append(e) }
 
@@ -61,14 +64,16 @@ enum FormValidation {
         alkUp: String,
         notes: String,
         waterClarity: String,
-        foamPresent: Bool
+        foamPresent: Bool,
+        isBromine: Bool
     ) -> [String] {
+        let sanitizerName = isBromine ? "Bromine" : "Chlorine"
         var errors: [String] = []
         if isFutureLoggedDay(loggedAt) {
             errors.append("Cannot log data for a future date")
         }
-        if let e = validateOptionalRange(combined, min: 0, max: 50, label: "Combined sanitizer (ppm)") { errors.append(e) }
-        if let e = validateOptionalRange(total, min: 0, max: 50, label: "Total sanitizer (ppm)") { errors.append(e) }
+        if let e = validateOptionalRange(combined, min: 0, max: 50, label: "Combined \(sanitizerName.lowercased()) (ppm)") { errors.append(e) }
+        if let e = validateOptionalRange(total, min: 0, max: 50, label: "Total \(sanitizerName.lowercased()) (ppm)") { errors.append(e) }
         if let e = validateOptionalRange(alkalinity, min: 0, max: 300, label: "Total alkalinity") { errors.append(e) }
         if let e = validateOptionalRange(copper, min: 0, max: 5, label: "Copper") { errors.append(e) }
         if let e = validateOptionalNonNegative(shock, label: "Shock added") { errors.append(e) }

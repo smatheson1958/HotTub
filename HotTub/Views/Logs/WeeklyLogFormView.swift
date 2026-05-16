@@ -39,6 +39,7 @@ struct WeeklyLogFormView: View {
 
     @State private var alertMessage: String?
     @State private var showAlert = false
+    @State private var helpTopic: HelpTopic?
     @Query private var settingsRows: [AppSettings]
 
     init(existing: WeeklyCheckLog? = nil) {
@@ -58,9 +59,9 @@ struct WeeklyLogFormView: View {
             }
 
             Section {
-                TextField("Combined sanitizer (ppm)", text: $combined)
+                TextField("Combined \(sanitizerName.lowercased()) (ppm)", text: $combined)
                     .keyboardType(.decimalPad)
-                TextField("Total sanitizer (ppm)", text: $total)
+                TextField("Total \(sanitizerName.lowercased()) (ppm)", text: $total)
                     .keyboardType(.decimalPad)
                 TextField("Total alkalinity", text: $alkalinity)
                     .keyboardType(.decimalPad)
@@ -103,6 +104,20 @@ struct WeeklyLogFormView: View {
         .navigationTitle(existing == nil ? "Weekly check" : "Edit weekly check")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("pH & alkalinity") { helpTopic = .ph }
+                    Button(settingsRows.first?.isBromine == true ? "Bromine" : "Chlorine") {
+                        helpTopic = .sanitizer
+                    }
+                    Button("Total alkalinity") { helpTopic = .alkalinity }
+                    Button("Copper") { helpTopic = .copper }
+                    Button("Shock treatment") { helpTopic = .shock }
+                    Button("Chemicals added") { helpTopic = .chemicalsAdded }
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }
             }
@@ -111,6 +126,13 @@ struct WeeklyLogFormView: View {
                     Button("Delete", role: .destructive) { deleteLog() }
                 }
             }
+        }
+        .sheet(item: $helpTopic) { topic in
+            HelpSheetView(
+                topic: topic,
+                isBromine: settingsRows.first?.isBromine ?? false,
+                isMetric: settingsRows.first?.measurementSystem != "imperial"
+            )
         }
         .onAppear {
             HotTubModelContainer.seedIfNeeded(in: modelContext)
@@ -135,6 +157,14 @@ struct WeeklyLogFormView: View {
         }
     }
 
+    private var isBromine: Bool {
+        settingsRows.first?.isBromine ?? false
+    }
+
+    private var sanitizerName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
+
     private func save() {
         let errs = FormValidation.validateWeekly(
             loggedAt: loggedAt,
@@ -146,7 +176,8 @@ struct WeeklyLogFormView: View {
             alkUp: alkUp,
             notes: notes,
             waterClarity: waterClarity,
-            foamPresent: foamPresent
+            foamPresent: foamPresent,
+            isBromine: isBromine
         )
         if !errs.isEmpty {
             alertMessage = errs.joined(separator: "\n")

@@ -58,9 +58,9 @@ struct WeeklyLogFormView: View {
             }
 
             Section {
-                TextField("Combined sanitizer (ppm)", text: $combined)
+                TextField("Combined \(sanitizerName.lowercased()) (ppm)", text: $combined)
                     .keyboardType(.decimalPad)
-                TextField("Total sanitizer (ppm)", text: $total)
+                TextField("Total \(sanitizerName.lowercased()) (ppm)", text: $total)
                     .keyboardType(.decimalPad)
                 TextField("Total alkalinity", text: $alkalinity)
                     .keyboardType(.decimalPad)
@@ -135,6 +135,14 @@ struct WeeklyLogFormView: View {
         }
     }
 
+    private var isBromine: Bool {
+        settingsRows.first?.isBromine ?? false
+    }
+
+    private var sanitizerName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
+
     private func save() {
         let errs = FormValidation.validateWeekly(
             loggedAt: loggedAt,
@@ -146,7 +154,8 @@ struct WeeklyLogFormView: View {
             alkUp: alkUp,
             notes: notes,
             waterClarity: waterClarity,
-            foamPresent: foamPresent
+            foamPresent: foamPresent,
+            isBromine: isBromine
         )
         if !errs.isEmpty {
             alertMessage = errs.joined(separator: "\n")

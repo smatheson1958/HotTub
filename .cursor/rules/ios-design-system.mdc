@@ -1,0 +1,59 @@
+---
+description: Default iOS UI design system for HotTub (Documents/ui + AppPalette)
+alwaysApply: true
+---
+
+# HotTub iOS design system
+
+**Source of truth:** `~/Documents/ui/` — read these when designing or refactoring UI:
+
+- `ios-design-principles.md` — feel, layout, corners, materials, navigation
+- `spacing-system.md` — 8pt grid, screen/card padding, touch targets
+- `typography.md` — SF Pro hierarchy
+- `component-rules.md` — cards, buttons, empty states, forms
+- `animation.md` — spring timing (0.2–0.35s)
+- `screen-template.md` — ScrollView + grouped cards structure
+- `review-checklist.md` — run before calling a screen done
+
+If a detail is missing here, follow the Documents/ui files above.
+
+## Feel
+
+Calm, spacious, premium, touch-friendly (Health / Fitness / Things / Flighty). Avoid clutter, heavy borders, dense Android-style cards, harsh shadows, tiny targets.
+
+## Layout
+
+- Prefer **ScrollView + VStack/LazyVStack** and **grouped cards** over default `List` styling.
+- Large navigation titles; minimal toolbar clutter.
+- Screen padding: horizontal **20**, vertical **16–24**; section gaps **24–32**; control gaps **12–16**.
+- **8pt grid only:** 4, 8, 12, 16, 20, 24, 32, 40 — no odd values (13, 17, 29).
+
+## Corners & surfaces
+
+- Card radius **16** (large cards **20–24**); fields/buttons **14** or capsule.
+- Backgrounds: `Color(.systemGroupedBackground)`, `Color(.secondarySystemGroupedBackground)`, materials (`.ultraThinMaterial`) where appropriate.
+- Shadows: very soft only (low opacity, small radius).
+
+## Colors (this project)
+
+Use **`AppPalette`** via `@Environment(\.appPalette)` and `PaletteToken` — do not sprinkle raw `Color(hex:)` in views. Semantic tokens live in `HotTub Buddy/Theme/AppPalette.swift` (keep `HotTub/Theme/AppPalette.swift` in sync if both targets are active).
+
+## Typography
+
+- Headers: `.largeTitle.weight(.bold)` or `.title2.weight(.semibold)`
+- Sections: `.headline`
+- Body: `.body`
+- Secondary: `.caption` + `.foregroundStyle(.secondary)`
+
+## Interaction
+
+- Minimum tap target **44×44**; primary buttons **≥50** height, `.borderedProminent` where appropriate.
+- Animate state changes with `.animation(.spring(response: 0.35), value: …)` — subtle, not everywhere.
+
+## Architecture
+
+- MVVM; small views; reusable card/section components; avoid giant view files and deep stack nesting.
+
+## Before finishing UI work
+
+Use `review-checklist.md` in Documents/ui — screen should scan in ~3 seconds and feel native iOS, not a dense dashboard.

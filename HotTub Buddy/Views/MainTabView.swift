@@ -10,30 +10,32 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
-            DashboardView()
-                .tabItem {
-                    Label("Dashboard", systemImage: "rectangle.split.2x1")
-                }
+            NavigationStack {
+                DashboardView()
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "house.fill")
+            }
 
             NavigationStack {
                 HistoryView()
             }
             .tabItem {
-                Label("History", systemImage: "doc.text")
+                Label("History", systemImage: "clock.arrow.circlepath")
             }
 
             NavigationStack {
                 ChartsScreenView()
             }
             .tabItem {
-                Label("Charts", systemImage: "chart.bar")
+                Label("Charts", systemImage: "chart.xyaxis.line")
             }
 
             NavigationStack {
                 SetupView()
             }
             .tabItem {
-                Label("Setup", systemImage: "gearshape")
+                Label("Setup", systemImage: "gearshape.fill")
             }
         }
         .tint(palette.color(.accentBlue))

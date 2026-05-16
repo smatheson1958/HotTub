@@ -61,7 +61,8 @@ enum RateCalculator {
         logs: [HotTubDailyLog],
         volumeLitres: Double,
         weeklyChecks: [WeeklyCheckLog],
-        maintenanceLogs: [MaintenanceLogEntry]
+        maintenanceLogs: [MaintenanceLogEntry],
+        isBromine: Bool = false
     ) -> [UsageRatePeriod] {
         guard logs.count >= 2 else { return [] }
 
@@ -117,7 +118,7 @@ enum RateCalculator {
                     gramsPerDay: (gramsPerDay * 100).rounded() / 100,
                     excludedFromCalc: chlorineShockInPeriod,
                     exclusionReason: chlorineShockInPeriod
-                        ? "Chlorine-based shock applied in this period"
+                        ? "\(isBromine ? "Bromine" : "Chlorine")-based shock applied in this period"
                         : nil
                 )
             )
@@ -129,13 +130,15 @@ enum RateCalculator {
         logs: [HotTubDailyLog],
         volumeLitres: Double,
         weeklyChecks: [WeeklyCheckLog],
-        maintenanceLogs: [MaintenanceLogEntry]
+        maintenanceLogs: [MaintenanceLogEntry],
+        isBromine: Bool = false
     ) -> UsageRatePeriod? {
         let rates = calculateUsageRates(
             logs: logs,
             volumeLitres: volumeLitres,
             weeklyChecks: weeklyChecks,
-            maintenanceLogs: maintenanceLogs
+            maintenanceLogs: maintenanceLogs,
+            isBromine: isBromine
         )
         let valid = rates.filter { !$0.excludedFromCalc }
         return valid.last
@@ -146,13 +149,15 @@ enum RateCalculator {
         volumeLitres: Double,
         days: Int = 7,
         weeklyChecks: [WeeklyCheckLog],
-        maintenanceLogs: [MaintenanceLogEntry]
+        maintenanceLogs: [MaintenanceLogEntry],
+        isBromine: Bool = false
     ) -> AverageRateResult? {
         let rates = calculateUsageRates(
             logs: logs,
             volumeLitres: volumeLitres,
             weeklyChecks: weeklyChecks,
-            maintenanceLogs: maintenanceLogs
+            maintenanceLogs: maintenanceLogs,
+            isBromine: isBromine
         )
         guard !rates.isEmpty else { return nil }
 

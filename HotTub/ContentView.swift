@@ -9,13 +9,22 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(DisclaimerAcceptance.storageKey) private var acceptedDisclaimerVersion = ""
 
     var body: some View {
-        MainTabView()
-            .appPalette(colorScheme)
-            .onAppear {
-                HotTubModelContainer.seedIfNeeded(in: modelContext)
+        Group {
+            if DisclaimerAcceptance.isAccepted(acceptedDisclaimerVersion) {
+                MainTabView()
+                    .onAppear {
+                        HotTubModelContainer.seedIfNeeded(in: modelContext)
+                    }
+            } else {
+                DisclaimerView {
+                    acceptedDisclaimerVersion = DisclaimerAcceptance.currentVersion
+                }
             }
+        }
+        .appPalette(colorScheme)
     }
 }
 
@@ -81,6 +90,10 @@ private struct ContentViewPreviewHost: View {
     var body: some View {
         ContentView()
             .onAppear {
+                UserDefaults.standard.set(
+                    DisclaimerAcceptance.currentVersion,
+                    forKey: DisclaimerAcceptance.storageKey
+                )
                 HotTubModelContainer.seedIfNeeded(in: modelContext)
                 seedPreviewSampleDailyLogs(into: modelContext)
             }

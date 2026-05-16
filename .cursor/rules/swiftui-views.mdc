@@ -1,0 +1,64 @@
+---
+description: SwiftUI view implementation patterns (Documents/ui applied in HotTub)
+globs:
+  - "HotTub Buddy/**/*.swift"
+  - "HotTub/**/*.swift"
+alwaysApply: false
+---
+
+# SwiftUI views (HotTub)
+
+Applies when editing Swift under `HotTub Buddy/` or `HotTub/`. Full system: `~/Documents/ui/` + always-on rule `ios-design-system`.
+
+## Screen skeleton
+
+```swift
+NavigationStack {
+    ScrollView {
+        VStack(alignment: .leading, spacing: 24) {
+            // section headings, AppGrouped-style cards
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
+    }
+    .scrollDismissesKeyboard(.interactively)
+    .background(Color(.systemGroupedBackground))
+    .navigationTitle("Title")
+    .navigationBarTitleDisplayMode(.large)
+}
+```
+
+## Cards
+
+```swift
+.padding(16)
+.frame(maxWidth: .infinity, alignment: .leading)
+.background(
+    RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
+)
+```
+
+Use `@Environment(\.appPalette) private var palette` and `palette.color(.surfaceCard)` (or matching token) instead of hard-coded fills.
+
+## Primary action
+
+```swift
+Button("Save") { }
+    .buttonStyle(.borderedProminent)
+    .controlSize(.large)
+    .frame(maxWidth: .infinity)
+    .frame(minHeight: 50)
+```
+
+## Empty state
+
+Icon (hierarchical SF Symbol) + `.title2.weight(.semibold)` title + `.caption` secondary line; optional single CTA.
+
+## Don’t
+
+- Default `List` for main content screens unless there is a strong reason
+- Multiple competing accent colors on one screen
+- Bold on every label; font size soup
+- Swipe-only actions without an obvious alternative when using ScrollView cards

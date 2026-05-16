@@ -25,6 +25,7 @@ struct DailyLogFormView: View {
 
     @State private var alertMessage: String?
     @State private var showAlert = false
+    @State private var helpTopic: HelpTopic?
     @Query private var settingsRows: [AppSettings]
 
     private var isCelsius: Bool {
@@ -59,14 +60,14 @@ struct DailyLogFormView: View {
                     .keyboardType(.decimalPad)
                 TextField(isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)", text: $sanitizerFree)
                     .keyboardType(.decimalPad)
-                TextField("Combined sanitizer (optional)", text: $sanitizerCombined)
+                TextField("\(sanitizerName) combined (optional)", text: $sanitizerCombined)
                     .keyboardType(.decimalPad)
             } header: {
                 Text("Readings")
             }
 
             Section {
-                TextField("Added sanitizer", text: $addedSanitizer)
+                TextField("\(sanitizerName) added", text: $addedSanitizer)
                     .keyboardType(.decimalPad)
                 TextField("pH Up added", text: $addedPhUp)
                     .keyboardType(.decimalPad)
@@ -86,6 +87,16 @@ struct DailyLogFormView: View {
         .navigationTitle(existing == nil ? "Daily log" : "Edit daily log")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("pH & alkalinity") { helpTopic = .ph }
+                    Button(isBromine ? "Bromine" : "Chlorine") { helpTopic = .sanitizer }
+                    Button("Temperature") { helpTopic = .temperature }
+                    Button("Chemicals added") { helpTopic = .chemicalsAdded }
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }
             }
@@ -94,6 +105,13 @@ struct DailyLogFormView: View {
                     Button("Delete", role: .destructive) { deleteLog() }
                 }
             }
+        }
+        .sheet(item: $helpTopic) { topic in
+            HelpSheetView(
+                topic: topic,
+                isBromine: isBromine,
+                isMetric: settingsRows.first?.measurementSystem != "imperial"
+            )
         }
         .onAppear {
             HotTubModelContainer.seedIfNeeded(in: modelContext)
@@ -122,6 +140,10 @@ struct DailyLogFormView: View {
         settingsRows.first?.isBromine ?? false
     }
 
+    private var sanitizerName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
+
     private func save() {
         let errs = FormValidation.validateDailyLog(
             loggedAt: loggedAt,
@@ -131,7 +153,8 @@ struct DailyLogFormView: View {
             addedSanitizer: addedSanitizer,
             addedPhUp: addedPhUp,
             addedPhDown: addedPhDown,
-            notes: notes
+            notes: notes,
+            isBromine: isBromine
         )
         if !errs.isEmpty {
             alertMessage = errs.joined(separator: "\n")

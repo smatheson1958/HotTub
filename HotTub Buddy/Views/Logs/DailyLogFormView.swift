@@ -59,14 +59,14 @@ struct DailyLogFormView: View {
                     .keyboardType(.decimalPad)
                 TextField(isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)", text: $sanitizerFree)
                     .keyboardType(.decimalPad)
-                TextField("Combined sanitizer (optional)", text: $sanitizerCombined)
+                TextField("\(sanitizerName) combined (optional)", text: $sanitizerCombined)
                     .keyboardType(.decimalPad)
             } header: {
                 Text("Readings")
             }
 
             Section {
-                TextField("Added sanitizer", text: $addedSanitizer)
+                TextField("\(sanitizerName) added", text: $addedSanitizer)
                     .keyboardType(.decimalPad)
                 TextField("pH Up added", text: $addedPhUp)
                     .keyboardType(.decimalPad)
@@ -122,6 +122,10 @@ struct DailyLogFormView: View {
         settingsRows.first?.isBromine ?? false
     }
 
+    private var sanitizerName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
+
     private func save() {
         let errs = FormValidation.validateDailyLog(
             loggedAt: loggedAt,
@@ -131,7 +135,8 @@ struct DailyLogFormView: View {
             addedSanitizer: addedSanitizer,
             addedPhUp: addedPhUp,
             addedPhDown: addedPhDown,
-            notes: notes
+            notes: notes,
+            isBromine: isBromine
         )
         if !errs.isEmpty {
             alertMessage = errs.joined(separator: "\n")

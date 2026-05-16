@@ -44,6 +44,10 @@ final class AppSettings {
     var isBromine: Bool {
         sanitizerType.lowercased() == "bromine"
     }
+
+    var sanitizerDisplayName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
 }
 
 @Model

@@ -108,14 +108,16 @@ final class DashboardViewModel: ObservableObject {
             logs: sortedDailyAsc,
             volumeLitres: volumeLitres,
             weeklyChecks: weekly,
-            maintenanceLogs: maintenance
+            maintenanceLogs: maintenance,
+            isBromine: isBromine
         )
         averageRate = RateCalculator.getAverageRate(
             logs: sortedDailyAsc,
             volumeLitres: volumeLitres,
             days: 7,
             weeklyChecks: weekly,
-            maintenanceLogs: maintenance
+            maintenanceLogs: maintenance,
+            isBromine: isBromine
         )
         dataConfidence = RateCalculator.getDataConfidence(
             logs: sortedDailyAsc,

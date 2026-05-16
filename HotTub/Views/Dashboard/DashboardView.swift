@@ -11,42 +11,33 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appPalette) private var palette
     @StateObject private var viewModel = DashboardViewModel()
+    @State private var consumptionHelpTopic: HelpTopic?
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                    statusCard
-                    consumptionSection
-                    quickActions
-                    recentActivity
-                }
-                .padding(.bottom, 28)
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.section) {
+                statusCard
+                consumptionSection
+                quickActions
+                recentActivity
             }
-            .background(palette.color(.backgroundSecondary).ignoresSafeArea())
-            .navigationTitle("Dashboard")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
+            .padding(.horizontal, AppSpacing.screenHorizontal)
+            .padding(.top, AppSpacing.screenTop)
+            .padding(.bottom, AppSpacing.screenBottom)
         }
+        .appGroupedScreenBackground(palette)
+        .navigationTitle("Dashboard")
+        .navigationBarTitleDisplayMode(.large)
         .task { viewModel.reload(context: modelContext) }
         .onAppear { viewModel.reload(context: modelContext) }
         .refreshable { viewModel.reload(context: modelContext) }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Welcome back")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(palette.color(.textSecondary))
-            Text("Hot Tub Monitor")
-                .font(.title.bold())
-                .foregroundStyle(palette.color(.textPrimary))
+        .sheet(item: $consumptionHelpTopic) { topic in
+            HelpSheetView(
+                topic: topic,
+                isBromine: viewModel.isBromine,
+                isMetric: viewModel.weightUnit == "g"
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 20)
     }
 
     private var statusCard: some View {
@@ -124,12 +115,10 @@ struct DashboardView: View {
                 }
             }
         }
-        .padding(22)
+        .padding(20)
         .background(gradient)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 24)
+        .clipShape(RoundedRectangle(cornerRadius: AppSpacing.largeCardRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 4)
     }
 
     private func sanitizerDisplay(_ log: HotTubDailyLog?) -> String {
@@ -142,16 +131,26 @@ struct DashboardView: View {
         if let rate = viewModel.currentRate,
            viewModel.dataConfidence?.confidence != "insufficient"
         {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: AppSpacing.control) {
+                HStack(spacing: AppSpacing.control) {
                     Image(systemName: "bolt.fill")
                         .foregroundStyle(palette.color(.accentOrange))
                         .padding(8)
                         .background(palette.color(.accentOrange).opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    Text("Sanitizer Consumption")
+                    Text("\(viewModel.isBromine ? "Bromine" : "Chlorine") Consumption")
                         .font(.headline)
                         .foregroundStyle(palette.color(.textPrimary))
+                    Spacer(minLength: 0)
+                    Button {
+                        consumptionHelpTopic = .consumption
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(palette.color(.accentBlue))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(viewModel.isBromine ? "Bromine" : "Chlorine") consumption help")
                 }
 
                 if let msg = viewModel.dataConfidence?.warningMessage {
@@ -216,25 +215,15 @@ struct DashboardView: View {
                     }
                 }
             }
-            .padding(18)
-            .background(palette.color(.surfaceCard))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(palette.color(.separator).opacity(0.6), lineWidth: 1)
-            )
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .appCard(palette: palette, radius: AppSpacing.largeCardRadius)
         }
     }
 
     private var quickActions: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Quick Actions")
-                .font(.headline)
-                .foregroundStyle(palette.color(.textPrimary))
+        VStack(alignment: .leading, spacing: AppSpacing.control) {
+            AppSectionHeader(title: "Quick actions")
 
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.control) {
                 NavigationLink {
                     ActivityHubView()
                 } label: {
@@ -260,8 +249,6 @@ struct DashboardView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 28)
     }
 
     private func quickActionTile(
@@ -283,47 +270,32 @@ struct DashboardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .background(palette.color(.surfaceCard))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(palette.color(.separator).opacity(0.6), lineWidth: 1)
-        )
+        .appCard(palette: palette, radius: AppSpacing.largeCardRadius)
     }
 
     private var recentActivity: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Recent Activity")
-                    .font(.headline)
-                    .foregroundStyle(palette.color(.textPrimary))
+        VStack(alignment: .leading, spacing: AppSpacing.control) {
+            HStack(alignment: .firstTextBaseline) {
+                AppSectionHeader(title: "Recent activity")
                 Spacer()
-                NavigationLink("See All") {
+                NavigationLink("See all") {
                     HistoryView()
                 }
                 .font(.subheadline.weight(.medium))
-                .tint(palette.color(.accentBlue))
             }
 
             if viewModel.recentActivity.isEmpty {
-                Text("No recent activity")
-                    .font(.subheadline)
-                    .foregroundStyle(palette.color(.textSecondary))
-                    .frame(maxWidth: .infinity)
-                    .padding(20)
-                    .background(palette.color(.surfaceCard))
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(palette.color(.separator).opacity(0.6), lineWidth: 1)
-                    )
+                AppEmptyState(
+                    symbol: "clock.arrow.circlepath",
+                    title: "No activity yet",
+                    message: "Log a daily reading or usage session to see it here."
+                )
             } else {
                 ForEach(viewModel.recentActivity) { item in
                     activityRow(item)
                 }
             }
         }
-        .padding(.horizontal, 20)
     }
 
     private func activityRow(_ item: DashboardActivity) -> some View {
@@ -356,13 +328,7 @@ struct DashboardView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(palette.color(.textTertiary))
             }
-            .padding(12)
-            .background(palette.color(.surfaceCard))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(palette.color(.separator).opacity(0.6), lineWidth: 1)
-            )
+            .appCard(palette: palette, padding: 12)
         }
         .buttonStyle(.plain)
         .contextMenu {
