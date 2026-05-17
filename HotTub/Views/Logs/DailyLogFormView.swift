@@ -25,11 +25,31 @@ struct DailyLogFormView: View {
 
     @State private var alertMessage: String?
     @State private var showAlert = false
-    @State private var helpTopic: HelpTopic?
+    @State private var presentedHelp: HelpSheetRequest?
     @Query private var settingsRows: [AppSettings]
 
     private var isCelsius: Bool {
         settingsRows.first?.temperatureUnit != "fahrenheit"
+    }
+
+    private var isBromine: Bool {
+        settingsRows.first?.isBromine ?? false
+    }
+
+    private var isMetric: Bool {
+        settingsRows.first?.measurementSystem != "imperial"
+    }
+
+    private var sanitizerName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
+
+    private var freeSanitizerPlaceholder: String {
+        isBromine ? "3.0-5.0" : "1.0-3.0"
+    }
+
+    private var weightUnit: String {
+        isMetric ? "g" : "oz"
     }
 
     init(existing: HotTubDailyLog? = nil) {
@@ -52,29 +72,67 @@ struct DailyLogFormView: View {
                     step: 1
                 )
             } header: {
-                Text("Temperature")
+                AppFormSectionHeader(
+                    title: "Temperature",
+                    helpRequest: HelpSheetRequest(topic: .temperature),
+                    presentedHelp: $presentedHelp
+                )
             }
 
             Section {
-                TextField("pH", text: $ph)
-                    .keyboardType(.decimalPad)
-                TextField(isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)", text: $sanitizerFree)
-                    .keyboardType(.decimalPad)
-                TextField("\(sanitizerName) combined (optional)", text: $sanitizerCombined)
-                    .keyboardType(.decimalPad)
+                VStack(alignment: .leading, spacing: 16) {
+                    AppLabeledFormField(
+                        title: "pH",
+                        helpRequest: .ph(.overview),
+                        presentedHelp: $presentedHelp,
+                        placeholder: "7.2-7.8",
+                        text: $ph
+                    )
+                    AppLabeledFormField(
+                        title: isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)",
+                        helpRequest: .sanitizer(.free),
+                        presentedHelp: $presentedHelp,
+                        placeholder: freeSanitizerPlaceholder,
+                        text: $sanitizerFree
+                    )
+                    if !isBromine {
+                        AppLabeledFormField(
+                            title: "Combined chlorine (ppm)",
+                            helpRequest: .sanitizer(.combined),
+                            presentedHelp: $presentedHelp,
+                            placeholder: "0.0-0.5",
+                            text: $sanitizerCombined
+                        )
+                    }
+                }
             } header: {
-                Text("Readings")
+                Text("Chemical readings")
             }
 
             Section {
-                TextField("\(sanitizerName) added", text: $addedSanitizer)
-                    .keyboardType(.decimalPad)
-                TextField("pH Up added", text: $addedPhUp)
-                    .keyboardType(.decimalPad)
-                TextField("pH Down added", text: $addedPhDown)
-                    .keyboardType(.decimalPad)
+                VStack(alignment: .leading, spacing: 16) {
+                    addedChemicalField(title: "\(sanitizerName) added (\(weightUnit))", text: $addedSanitizer)
+                    AppLabeledFormField(
+                        title: "pH Down added (\(weightUnit))",
+                        helpRequest: .ph(.down),
+                        presentedHelp: $presentedHelp,
+                        placeholder: "0.0 \(weightUnit)",
+                        text: $addedPhDown
+                    )
+                    AppLabeledFormField(
+                        title: "pH Up added (\(weightUnit))",
+                        helpRequest: .ph(.up),
+                        presentedHelp: $presentedHelp,
+                        placeholder: "0.0 \(weightUnit)",
+                        text: $addedPhUp
+                    )
+                }
             } header: {
-                Text("Chemicals added")
+                AppFormSectionHeader(
+                    title: "Chemicals added",
+                    helpRequest: HelpSheetRequest(topic: .chemicalsAdded),
+                    presentedHelp: $presentedHelp
+                )
             }
 
             Section {
@@ -87,16 +145,6 @@ struct DailyLogFormView: View {
         .navigationTitle(existing == nil ? "Daily log" : "Edit daily log")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button("pH & alkalinity") { helpTopic = .ph }
-                    Button(isBromine ? "Bromine" : "Chlorine") { helpTopic = .sanitizer }
-                    Button("Temperature") { helpTopic = .temperature }
-                    Button("Chemicals added") { helpTopic = .chemicalsAdded }
-                } label: {
-                    Image(systemName: "questionmark.circle")
-                }
-            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }
             }
@@ -106,13 +154,7 @@ struct DailyLogFormView: View {
                 }
             }
         }
-        .sheet(item: $helpTopic) { topic in
-            HelpSheetView(
-                topic: topic,
-                isBromine: isBromine,
-                isMetric: settingsRows.first?.measurementSystem != "imperial"
-            )
-        }
+        .helpSheet(presentedHelp: $presentedHelp, isBromine: isBromine, isMetric: isMetric)
         .onAppear {
             HotTubModelContainer.seedIfNeeded(in: modelContext)
             if let e = existing {
@@ -136,12 +178,15 @@ struct DailyLogFormView: View {
         }
     }
 
-    private var isBromine: Bool {
-        settingsRows.first?.isBromine ?? false
-    }
-
-    private var sanitizerName: String {
-        isBromine ? "Bromine" : "Chlorine"
+    @ViewBuilder
+    private func addedChemicalField(title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(palette.color(.textSecondary))
+            TextField("0.0 \(weightUnit)", text: text)
+                .keyboardType(.decimalPad)
+        }
     }
 
     private func save() {

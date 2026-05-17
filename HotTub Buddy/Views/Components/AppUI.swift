@@ -182,6 +182,128 @@ struct AppSettingsValueRow: View {
     }
 }
 
+// MARK: - Info popover
+
+struct AppInfoButton: View {
+    let message: String
+    var accessibilityLabel: String = "More information"
+    var foreground: Color?
+
+    @State private var isPresented = false
+    @Environment(\.appPalette) private var palette
+
+    var body: some View {
+        Button {
+            isPresented = true
+        } label: {
+            Image(systemName: "questionmark.circle")
+                .font(.title3)
+                .foregroundStyle(foreground ?? palette.color(.textSecondary))
+                .frame(width: AppSpacing.minTap, height: AppSpacing.minTap)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .popover(isPresented: $isPresented) {
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(palette.color(.textPrimary))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(16)
+                .frame(maxWidth: 280)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
+// MARK: - Help topic sheet (React HelpModal per-field buttons)
+
+struct AppHelpTopicButton: View {
+    let request: HelpSheetRequest
+    @Binding var presentedRequest: HelpSheetRequest?
+    var accessibilityLabel: String?
+
+    @Environment(\.appPalette) private var palette
+
+    var body: some View {
+        Button {
+            presentedRequest = request
+        } label: {
+            Image(systemName: "questionmark.circle")
+                .font(.body)
+                .foregroundStyle(palette.color(.accentBlue))
+                .frame(width: AppSpacing.minTap, height: AppSpacing.minTap)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel ?? request.topic.screenTitle)
+    }
+}
+
+struct AppFormFieldLabel: View {
+    let title: String
+    let helpRequest: HelpSheetRequest
+    @Binding var presentedHelp: HelpSheetRequest?
+
+    @Environment(\.appPalette) private var palette
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(palette.color(.textSecondary))
+            Spacer(minLength: 0)
+            AppHelpTopicButton(request: helpRequest, presentedRequest: $presentedHelp)
+        }
+    }
+}
+
+struct AppFormSectionHeader: View {
+    let title: String
+    var helpRequest: HelpSheetRequest?
+    @Binding var presentedHelp: HelpSheetRequest?
+
+    var body: some View {
+        if let helpRequest {
+            HStack(alignment: .center, spacing: 8) {
+                Text(title)
+                Spacer(minLength: 0)
+                AppHelpTopicButton(request: helpRequest, presentedRequest: $presentedHelp)
+            }
+        } else {
+            Text(title)
+        }
+    }
+}
+
+struct AppLabeledFormField: View {
+    let title: String
+    let helpRequest: HelpSheetRequest
+    @Binding var presentedHelp: HelpSheetRequest?
+    var placeholder: String = ""
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            AppFormFieldLabel(title: title, helpRequest: helpRequest, presentedHelp: $presentedHelp)
+            TextField(placeholder, text: $text)
+                .keyboardType(.decimalPad)
+        }
+    }
+}
+
+extension View {
+    func helpSheet(
+        presentedHelp: Binding<HelpSheetRequest?>,
+        isBromine: Bool,
+        isMetric: Bool
+    ) -> some View {
+        sheet(item: presentedHelp) { request in
+            HelpSheetView(request: request, isBromine: isBromine, isMetric: isMetric)
+        }
+    }
+}
+
 // MARK: - Primary button
 
 struct AppPrimaryButton: View {

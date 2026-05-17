@@ -2,21 +2,30 @@
 //  HelpContentPh.swift
 //  HotTub Buddy
 //
-//  Migrated from React `HelpModal/content/PhContent.jsx`.
+//  Single pH guide; `focus` controls which section opens first.
 //
 
 import SwiftUI
 
 struct HelpPhContent: View {
+    var focus: PhHelpFocus = .overview
     @Environment(\.appPalette) private var palette
+
+    private var headline: String {
+        switch focus {
+        case .overview: return "pH Help Guide"
+        case .down: return "pH Down Guide"
+        case .up: return "pH Up Guide"
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("pH & Alkalinity Help Guide")
+            Text(headline)
                 .font(.title3.weight(.bold))
                 .foregroundStyle(palette.color(.textPrimary))
 
-            HelpCollapsibleSection(title: "pH – What it is", defaultExpanded: true) {
+            HelpCollapsibleSection(title: "pH – What it is", defaultExpanded: focus == .overview) {
                 HelpParagraph(text: "pH measures how acidic or alkaline the water is.", bold: true)
                 HelpParagraph(text: "It affects comfort, sanitizer efficiency, and equipment life.", topPadding: 8)
                 HelpIdealRange(label: "Ideal pH range", value: "7.2 – 7.6")
@@ -24,7 +33,7 @@ struct HelpPhContent: View {
                 HelpBullet(text: "High pH = alkaline")
             }
 
-            HelpCollapsibleSection(title: "pH Down (Lower pH)") {
+            HelpCollapsibleSection(title: "pH Down (Lower pH)", defaultExpanded: focus == .down) {
                 HelpParagraph(text: "Common scenarios", bold: true)
                 HelpBullet(text: "pH is above 7.6")
                 HelpBullet(text: "Water looks dull or cloudy")
@@ -44,7 +53,7 @@ struct HelpPhContent: View {
                 }
             }
 
-            HelpCollapsibleSection(title: "pH Up (Raise pH)") {
+            HelpCollapsibleSection(title: "pH Up (Raise pH)", defaultExpanded: focus == .up) {
                 HelpParagraph(text: "Common scenarios", bold: true)
                 HelpBullet(text: "pH is below 7.2")
                 HelpBullet(text: "Water feels sharp or irritating")
@@ -55,72 +64,28 @@ struct HelpPhContent: View {
                 HelpBullet(text: "Retest before adding more")
                 HelpInfoBox {
                     Text(
-                        "pH Up can also raise alkalinity. Consult product labels for specific guidance."
+                        "pH Up can also raise alkalinity. If total alkalinity is out of range, fix that first (see the alkalinity guide on weekly check), then fine-tune pH."
                     )
                     .font(.subheadline)
                     .foregroundStyle(palette.color(.textSecondary))
                 }
             }
 
-            HelpCollapsibleSection(title: "Total Alkalinity (TA) – What it is") {
-                HelpParagraph(text: "Alkalinity buffers pH and helps prevent rapid pH swings.", bold: true)
-                HelpIdealRange(label: "Ideal TA range", value: "80 – 120 ppm")
-                HelpBullet(text: "Too high = pH keeps rising")
-                HelpBullet(text: "Too low = pH unstable and hard to control")
-            }
-
-            HelpCollapsibleSection(title: "Alkalinity Up (Raise TA)") {
-                HelpParagraph(text: "Common scenarios", bold: true)
-                HelpBullet(text: "TA is below 80 ppm")
-                HelpBullet(text: "pH swings up and down quickly")
-                HelpBullet(text: "Water chemistry is unstable")
-                HelpParagraph(text: "Typical process (for reference)", bold: true, topPadding: 12)
-                HelpBullet(text: "Typically, users add Alkalinity Up in small stages")
-                HelpBullet(text: "Circulate for 30 minutes")
-                HelpBullet(text: "Retest TA before adding more")
-                HelpInfoBox {
-                    Text(
-                        "Alkalinity Up raises pH as well. Common practice is to adjust alkalinity first, then pH. Always consult manufacturer guidelines."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(palette.color(.textSecondary))
-                }
-            }
-
-            HelpCollapsibleSection(title: "Alkalinity Down (Lower TA)") {
-                HelpParagraph(text: "Common scenarios", bold: true)
-                HelpBullet(text: "TA is above 120–150 ppm")
-                HelpBullet(text: "pH keeps drifting up despite adjustments")
-                HelpParagraph(text: "General guidance (educational)", bold: true, topPadding: 12)
-                HelpWarningBox {
-                    Text("Alkalinity Down is typically NOT a common practice for direct use")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(palette.color(.statusWarningText))
-                }
-                HelpParagraph(text: "Common approach:", topPadding: 8)
-                HelpBullet(text: "Lower pH to ~7.2 using pH Down")
-                HelpBullet(text: "Allow aeration/use to slowly bring pH back up")
-                HelpBullet(text: "This process reduces TA naturally")
-                HelpInfoBox {
-                    Text(
-                        "Direct TA reducers can overshoot and cause instability. Consult a spa professional for specific advice."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(palette.color(.textSecondary))
-                }
-            }
-
-            HelpCollapsibleSection(title: "Common Adjustment Sequence (For Reference)") {
-                HelpBullet(text: "1. Fix Alkalinity first (if outside range)")
-                HelpBullet(text: "2. Then adjust pH")
-                HelpBullet(text: "3. Make changes slowly and retest often")
-            }
-
-            HelpCollapsibleSection(title: "Common Mistakes to Avoid") {
-                HelpBullet(text: "Chasing \"perfect\" numbers in one go")
+            HelpCollapsibleSection(title: "Common Mistakes to Avoid", defaultExpanded: focus == .overview) {
+                HelpBullet(text: "Chasing \"perfect\" pH in one go")
                 HelpBullet(text: "Adding pH Up and Down on the same day")
                 HelpBullet(text: "Running air jets while lowering pH")
-                HelpBullet(text: "Raising alkalinity when pH is already high")
+                HelpBullet(text: "Adjusting pH when total alkalinity is far out of range")
+            }
+
+            if focus == .overview {
+                HelpInfoBox {
+                    Text(
+                        "Total alkalinity buffers pH. For alkalinity testing, raising/lowering TA, and adjustment order, open the help on Total alkalinity in the weekly check."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(palette.color(.textSecondary))
+                }
             }
 
             HelpEducationalDisclaimer()

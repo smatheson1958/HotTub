@@ -114,11 +114,11 @@ final class DashboardViewModel: ObservableObject {
         } else {
             sanitizerOk = sanitizer.map { $0 >= 1.0 && $0 <= 3.0 } ?? false
         }
-        let sanitizerName = isBromine ? "bromine" : "chlorine"
+        let sanitizerShort = isBromine ? "bromine" : "CH"
         if phOk && sanitizerOk { return "Within typical range" }
-        if !phOk && !sanitizerOk { return "pH and \(sanitizerName) outside typical range" }
+        if !phOk && !sanitizerOk { return "pH and \(sanitizerShort) outside typical range" }
         if !phOk { return "pH outside typical range" }
-        return "\(sanitizerName.capitalized) outside typical range"
+        return "\(isBromine ? "Bromine" : "CH") outside typical range"
     }
 
     func sanitizerOutOfRange(_ ppm: Double?) -> Bool {

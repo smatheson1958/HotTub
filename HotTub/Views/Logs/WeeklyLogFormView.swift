@@ -39,7 +39,7 @@ struct WeeklyLogFormView: View {
 
     @State private var alertMessage: String?
     @State private var showAlert = false
-    @State private var helpTopic: HelpTopic?
+    @State private var presentedHelp: HelpSheetRequest?
     @Query private var settingsRows: [AppSettings]
 
     init(existing: WeeklyCheckLog? = nil) {
@@ -47,7 +47,23 @@ struct WeeklyLogFormView: View {
     }
 
     private var shockOptions: [(String, String)] {
-        settingsRows.first?.isBromine == true ? bromineShockOptions : chlorineShockOptions
+        isBromine ? bromineShockOptions : chlorineShockOptions
+    }
+
+    private var isBromine: Bool {
+        settingsRows.first?.isBromine ?? false
+    }
+
+    private var isMetric: Bool {
+        settingsRows.first?.measurementSystem != "imperial"
+    }
+
+    private var sanitizerName: String {
+        isBromine ? "Bromine" : "Chlorine"
+    }
+
+    private var weightUnit: String {
+        isMetric ? "g" : "oz"
     }
 
     var body: some View {
@@ -59,14 +75,36 @@ struct WeeklyLogFormView: View {
             }
 
             Section {
-                TextField("Combined \(sanitizerName.lowercased()) (ppm)", text: $combined)
-                    .keyboardType(.decimalPad)
-                TextField("Total \(sanitizerName.lowercased()) (ppm)", text: $total)
-                    .keyboardType(.decimalPad)
-                TextField("Total alkalinity", text: $alkalinity)
-                    .keyboardType(.decimalPad)
-                TextField("Copper (ppm)", text: $copper)
-                    .keyboardType(.decimalPad)
+                VStack(alignment: .leading, spacing: 16) {
+                    AppLabeledFormField(
+                        title: "Combined \(sanitizerName.lowercased()) (ppm)",
+                        helpRequest: .sanitizer(.combined),
+                        presentedHelp: $presentedHelp,
+                        placeholder: "0.0-0.5",
+                        text: $combined
+                    )
+                    AppLabeledFormField(
+                        title: "Total \(sanitizerName.lowercased()) (ppm)",
+                        helpRequest: .sanitizer(.total),
+                        presentedHelp: $presentedHelp,
+                        placeholder: isBromine ? "3.0-5.0" : "1.0-3.0",
+                        text: $total
+                    )
+                    AppLabeledFormField(
+                        title: "Total alkalinity (ppm)",
+                        helpRequest: HelpSheetRequest(topic: .alkalinity),
+                        presentedHelp: $presentedHelp,
+                        placeholder: "80-120",
+                        text: $alkalinity
+                    )
+                    AppLabeledFormField(
+                        title: "Copper (ppm)",
+                        helpRequest: HelpSheetRequest(topic: .copper),
+                        presentedHelp: $presentedHelp,
+                        placeholder: "0.0-0.3",
+                        text: $copper
+                    )
+                }
             } header: {
                 Text("Water chemistry")
             }
@@ -80,18 +118,34 @@ struct WeeklyLogFormView: View {
             }
 
             Section {
-                TextField("Shock added", text: $shock)
-                    .keyboardType(.decimalPad)
-                Picker("Shock type", selection: $shockType) {
-                    Text("—").tag("")
-                    ForEach(shockOptions, id: \.1) { label, value in
-                        Text(label).tag(value)
+                VStack(alignment: .leading, spacing: 16) {
+                    adjustmentField(title: "Shock added (\(weightUnit))", text: $shock)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Shock type")
+                            .font(.subheadline)
+                            .foregroundStyle(palette.color(.textSecondary))
+                        Picker("Shock type", selection: $shockType) {
+                            Text("—").tag("")
+                            ForEach(shockOptions, id: \.1) { label, value in
+                                Text(label).tag(value)
+                            }
+                        }
+                        .labelsHidden()
                     }
+                    AppLabeledFormField(
+                        title: "Alkalinity Up added (\(weightUnit))",
+                        helpRequest: HelpSheetRequest(topic: .alkalinity),
+                        presentedHelp: $presentedHelp,
+                        placeholder: "0.0 \(weightUnit)",
+                        text: $alkUp
+                    )
                 }
-                TextField("Alkalinity Up added", text: $alkUp)
-                    .keyboardType(.decimalPad)
             } header: {
-                Text("Shock & adjustments")
+                AppFormSectionHeader(
+                    title: "Shock & adjustments",
+                    helpRequest: HelpSheetRequest(topic: .shock),
+                    presentedHelp: $presentedHelp
+                )
             }
 
             Section {
@@ -104,20 +158,6 @@ struct WeeklyLogFormView: View {
         .navigationTitle(existing == nil ? "Weekly check" : "Edit weekly check")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button("pH & alkalinity") { helpTopic = .ph }
-                    Button(settingsRows.first?.isBromine == true ? "Bromine" : "Chlorine") {
-                        helpTopic = .sanitizer
-                    }
-                    Button("Total alkalinity") { helpTopic = .alkalinity }
-                    Button("Copper") { helpTopic = .copper }
-                    Button("Shock treatment") { helpTopic = .shock }
-                    Button("Chemicals added") { helpTopic = .chemicalsAdded }
-                } label: {
-                    Image(systemName: "questionmark.circle")
-                }
-            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }
             }
@@ -127,13 +167,7 @@ struct WeeklyLogFormView: View {
                 }
             }
         }
-        .sheet(item: $helpTopic) { topic in
-            HelpSheetView(
-                topic: topic,
-                isBromine: settingsRows.first?.isBromine ?? false,
-                isMetric: settingsRows.first?.measurementSystem != "imperial"
-            )
-        }
+        .helpSheet(presentedHelp: $presentedHelp, isBromine: isBromine, isMetric: isMetric)
         .onAppear {
             HotTubModelContainer.seedIfNeeded(in: modelContext)
             if let e = existing {
@@ -157,12 +191,15 @@ struct WeeklyLogFormView: View {
         }
     }
 
-    private var isBromine: Bool {
-        settingsRows.first?.isBromine ?? false
-    }
-
-    private var sanitizerName: String {
-        isBromine ? "Bromine" : "Chlorine"
+    @ViewBuilder
+    private func adjustmentField(title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(palette.color(.textSecondary))
+            TextField("0.0 \(weightUnit)", text: text)
+                .keyboardType(.decimalPad)
+        }
     }
 
     private func save() {

@@ -63,9 +63,21 @@ struct DashboardView: View {
                 .clipShape(Capsule())
             }
 
-            Text(hasData ? "Latest readings" : "Your hot tub")
-                .font(.body)
-                .foregroundStyle(palette.color(.onAccent).opacity(0.85))
+            HStack(alignment: .center, spacing: 8) {
+                Text(hasData ? "Latest readings" : "Your hot tub")
+                    .font(.body)
+                    .foregroundStyle(palette.color(.onAccent).opacity(0.85))
+
+                Spacer(minLength: 0)
+
+                if hasData {
+                    AppInfoButton(
+                        message: "Typical ranges are for reference only. Test your water and follow product labels before adding chemicals.",
+                        accessibilityLabel: "About typical ranges",
+                        foreground: palette.color(.onAccent).opacity(0.75)
+                    )
+                }
+            }
 
             Text(
                 log.map {
@@ -74,15 +86,9 @@ struct DashboardView: View {
             )
             .font(.system(size: 28, weight: .heavy))
             .foregroundStyle(palette.color(.onAccent))
-
-            if hasData {
-                Text(
-                    "Typical ranges are for reference only. Test your water and follow product labels before adding chemicals."
-                )
-                .font(.caption)
-                .foregroundStyle(palette.color(.onAccent).opacity(0.75))
-                .fixedSize(horizontal: false, vertical: true)
-            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 28) {
                 VStack(alignment: .leading, spacing: 4) {
