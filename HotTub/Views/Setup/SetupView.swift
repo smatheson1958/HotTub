@@ -106,7 +106,7 @@ private struct SetupSettingsForm: View {
         VStack(alignment: .leading, spacing: AppSpacing.control) {
             AppSectionHeader(
                 title: "Volume",
-                subtitle: "Used for consumption estimates on the dashboard"
+                subtitle: "Stored with your tub settings for future reference"
             )
 
             AppSettingsValueRow(

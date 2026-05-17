@@ -11,13 +11,11 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appPalette) private var palette
     @StateObject private var viewModel = DashboardViewModel()
-    @State private var consumptionHelpTopic: HelpTopic?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.section) {
                 statusCard
-                consumptionSection
                 quickActions
                 recentActivity
             }
@@ -31,13 +29,6 @@ struct DashboardView: View {
         .task { viewModel.reload(context: modelContext) }
         .onAppear { viewModel.reload(context: modelContext) }
         .refreshable { viewModel.reload(context: modelContext) }
-        .sheet(item: $consumptionHelpTopic) { topic in
-            HelpSheetView(
-                topic: topic,
-                isBromine: viewModel.isBromine,
-                isMetric: viewModel.weightUnit == "g"
-            )
-        }
     }
 
     private var statusCard: some View {
@@ -72,17 +63,26 @@ struct DashboardView: View {
                 .clipShape(Capsule())
             }
 
-            Text("Current Status")
+            Text(hasData ? "Latest readings" : "Your hot tub")
                 .font(.body)
                 .foregroundStyle(palette.color(.onAccent).opacity(0.85))
 
             Text(
                 log.map {
-                    viewModel.statusText(ph: $0.ph, sanitizer: $0.primarySanitizerPpm)
+                    viewModel.statusSummary(ph: $0.ph, sanitizer: $0.primarySanitizerPpm)
                 } ?? "Ready to start?"
             )
             .font(.system(size: 28, weight: .heavy))
             .foregroundStyle(palette.color(.onAccent))
+
+            if hasData {
+                Text(
+                    "Typical ranges are for reference only. Test your water and follow product labels before adding chemicals."
+                )
+                .font(.caption)
+                .foregroundStyle(palette.color(.onAccent).opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+            }
 
             HStack(spacing: 28) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -124,99 +124,6 @@ struct DashboardView: View {
     private func sanitizerDisplay(_ log: HotTubDailyLog?) -> String {
         guard let ppm = log?.primarySanitizerPpm else { return "-- ppm" }
         return String(format: "%.1f ppm", ppm)
-    }
-
-    @ViewBuilder
-    private var consumptionSection: some View {
-        if let rate = viewModel.currentRate,
-           viewModel.dataConfidence?.confidence != "insufficient"
-        {
-            VStack(alignment: .leading, spacing: AppSpacing.control) {
-                HStack(spacing: AppSpacing.control) {
-                    Image(systemName: "bolt.fill")
-                        .foregroundStyle(palette.color(.accentOrange))
-                        .padding(8)
-                        .background(palette.color(.accentOrange).opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    Text("\(viewModel.isBromine ? "Bromine" : "Chlorine") Consumption")
-                        .font(.headline)
-                        .foregroundStyle(palette.color(.textPrimary))
-                    Spacer(minLength: 0)
-                    Button {
-                        consumptionHelpTopic = .consumption
-                    } label: {
-                        Image(systemName: "questionmark.circle")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(palette.color(.accentBlue))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(viewModel.isBromine ? "Bromine" : "Chlorine") consumption help")
-                }
-
-                if let msg = viewModel.dataConfidence?.warningMessage {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundStyle(palette.color(.accentOrange))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Limited Data Available")
-                                .font(.subheadline.weight(.semibold))
-                            Text(msg)
-                                .font(.caption)
-                                .foregroundStyle(palette.color(.textSecondary))
-                        }
-                    }
-                    .padding(12)
-                    .background(palette.color(.statusWarningFill))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(palette.color(.statusWarningBorder), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-
-                VStack(spacing: 6) {
-                    Text("\(formatGrams(rate.gramsPerDay)) \(viewModel.weightUnit)/day")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(palette.color(.textPrimary))
-                    Text("\(formatGrams(rate.ppmPerDay)) ppm/day • Last \(formatDays(rate.daysElapsed))")
-                        .font(.subheadline)
-                        .foregroundStyle(palette.color(.textSecondary))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-
-                if let avg = viewModel.averageRate {
-                    Divider()
-                        .background(palette.color(.separator))
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("7-day average")
-                                .font(.caption)
-                                .foregroundStyle(palette.color(.textTertiary))
-                            Text("\(formatGrams(avg.avgGramsPerDay)) \(viewModel.weightUnit)/day")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(palette.color(.textPrimary))
-                        }
-                        Spacer()
-                        if let pct = viewModel.trendPercent, let up = viewModel.trendUp {
-                            HStack(spacing: 4) {
-                                Image(systemName: up ? "arrow.up.right" : "arrow.down.right")
-                                Text("\(Int(pct))%")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                            .foregroundStyle(up ? palette.color(.accentRed) : palette.color(.accentGreen))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                (up ? palette.color(.accentRed) : palette.color(.accentGreen)).opacity(0.12)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        }
-                    }
-                }
-            }
-            .appCard(palette: palette, radius: AppSpacing.largeCardRadius)
-        }
     }
 
     private var quickActions: some View {
@@ -385,11 +292,4 @@ struct DashboardView: View {
         return f.string(from: date)
     }
 
-    private func formatGrams(_ v: Double) -> String {
-        String(format: "%.2f", v)
-    }
-
-    private func formatDays(_ v: Double) -> String {
-        v == floor(v) ? String(format: "%.0f", v) : String(format: "%.1f", v)
-    }
 }

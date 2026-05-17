@@ -63,14 +63,7 @@ enum DashboardActivity: Identifiable {
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var latestDailyLog: HotTubDailyLog?
     @Published private(set) var recentActivity: [DashboardActivity] = []
-    @Published private(set) var currentRate: UsageRatePeriod?
-    @Published private(set) var averageRate: AverageRateResult?
-    @Published private(set) var dataConfidence: DataConfidence?
-    @Published private(set) var trendPercent: Double?
-    @Published private(set) var trendUp: Bool?
-    @Published private(set) var volumeLitres: Double = 1000
     @Published private(set) var isBromine: Bool = false
-    @Published private(set) var weightUnit: String = "g"
 
     func reload(context: ModelContext) {
         HotTubModelContainer.seedIfNeeded(in: context)
@@ -85,10 +78,7 @@ final class DashboardViewModel: ObservableObject {
         let sortedDaily = daily.sorted { $0.loggedAt > $1.loggedAt }
         latestDailyLog = sortedDaily.first
 
-        volumeLitres = settings?.volumeLitres ?? 1000
         isBromine = settings?.isBromine ?? false
-        let metric = settings?.measurementSystem != "imperial"
-        weightUnit = metric ? "g" : "oz"
 
         var combined: [DashboardActivity] = []
         combined.append(contentsOf: daily.map { .daily($0) })
@@ -101,41 +91,6 @@ final class DashboardViewModel: ObservableObject {
             return a.createdAtMoment > b.createdAtMoment
         }
         recentActivity = Array(combined.prefix(4))
-
-        let sortedDailyAsc = daily.sorted { $0.loggedAt < $1.loggedAt }
-
-        currentRate = RateCalculator.getCurrentRate(
-            logs: sortedDailyAsc,
-            volumeLitres: volumeLitres,
-            weeklyChecks: weekly,
-            maintenanceLogs: maintenance,
-            isBromine: isBromine
-        )
-        averageRate = RateCalculator.getAverageRate(
-            logs: sortedDailyAsc,
-            volumeLitres: volumeLitres,
-            days: 7,
-            weeklyChecks: weekly,
-            maintenanceLogs: maintenance,
-            isBromine: isBromine
-        )
-        dataConfidence = RateCalculator.getDataConfidence(
-            logs: sortedDailyAsc,
-            maintenanceLogs: maintenance
-        )
-
-        trendPercent = nil
-        trendUp = nil
-        if let cur = currentRate, let avg = averageRate, avg.avgGramsPerDay > 0 {
-            let pct = ((cur.gramsPerDay - avg.avgGramsPerDay) / avg.avgGramsPerDay) * 100
-            if pct > 5 {
-                trendUp = true
-                trendPercent = abs((pct * 10).rounded() / 10)
-            } else if pct < -5 {
-                trendUp = false
-                trendPercent = abs((pct * 10).rounded() / 10)
-            }
-        }
     }
 
     func delete(_ item: DashboardActivity, context: ModelContext) {
@@ -149,19 +104,21 @@ final class DashboardViewModel: ObservableObject {
         reload(context: context)
     }
 
-    func statusText(ph: Double?, sanitizer: Double?) -> String {
-        if ph == nil && sanitizer == nil { return "No data" }
+    /// Neutral summary of last readings vs typical reference ranges — not treatment advice.
+    func statusSummary(ph: Double?, sanitizer: Double?) -> String {
+        if ph == nil && sanitizer == nil { return "No readings logged" }
         let phOk = ph.map { $0 >= 7.2 && $0 <= 7.8 } ?? false
-        let clOk: Bool
+        let sanitizerOk: Bool
         if isBromine {
-            clOk = sanitizer.map { $0 >= 3.0 && $0 <= 5.0 } ?? false
+            sanitizerOk = sanitizer.map { $0 >= 3.0 && $0 <= 5.0 } ?? false
         } else {
-            clOk = sanitizer.map { $0 >= 1.0 && $0 <= 3.0 } ?? false
+            sanitizerOk = sanitizer.map { $0 >= 1.0 && $0 <= 3.0 } ?? false
         }
-        if phOk && clOk { return "Balanced" }
-        if !phOk && !clOk { return "Check pH & \(isBromine ? "Bromine" : "Chlorine")" }
-        if !phOk { return "Check pH Level" }
-        return "Check \(isBromine ? "Bromine" : "Chlorine")"
+        let sanitizerName = isBromine ? "bromine" : "chlorine"
+        if phOk && sanitizerOk { return "Within typical range" }
+        if !phOk && !sanitizerOk { return "pH and \(sanitizerName) outside typical range" }
+        if !phOk { return "pH outside typical range" }
+        return "\(sanitizerName.capitalized) outside typical range"
     }
 
     func sanitizerOutOfRange(_ ppm: Double?) -> Bool {
