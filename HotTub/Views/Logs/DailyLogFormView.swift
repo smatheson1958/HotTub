@@ -57,34 +57,47 @@ struct DailyLogFormView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                DatePicker("Date & time", selection: $loggedAt, displayedComponents: [.date, .hourAndMinute])
-            } header: {
-                Text("When")
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.section) {
+                AppFormScreenSection(title: "When", presentedHelp: $presentedHelp) {
+                    DatePicker(
+                        "Date & time",
+                        selection: $loggedAt,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            Section {
-                Stepper(
-                    "Water \(isCelsius ? "°C" : "°F"): \(waterTemp)",
-                    value: $waterTemp,
-                    in: isCelsius ? 10 ... 45 : 50 ... 110,
-                    step: 1
-                )
-            } header: {
-                AppFormSectionHeader(
+                AppFormScreenSection(
                     title: "Temperature",
                     helpRequest: HelpSheetRequest(topic: .temperature),
                     presentedHelp: $presentedHelp
-                )
-            }
+                ) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "thermometer.medium")
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(palette.color(.accentBlue))
+                            .frame(width: 24, alignment: .center)
+                        Stepper(
+                            "Water \(isCelsius ? "°C" : "°F"): \(waterTemp)",
+                            value: $waterTemp,
+                            in: isCelsius ? 10 ... 45 : 50 ... 110,
+                            step: 1
+                        )
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(palette.color(.textPrimary))
+                    }
+                    .frame(minHeight: AppSpacing.minTap)
+                }
 
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
+                AppFormScreenSection(title: "Chemical readings", presentedHelp: $presentedHelp) {
                     AppLabeledFormField(
                         title: "pH",
                         helpRequest: .ph(.overview),
                         presentedHelp: $presentedHelp,
+                        systemImage: "flask",
                         placeholder: "7.2-7.8",
                         text: $ph
                     )
@@ -92,6 +105,7 @@ struct DailyLogFormView: View {
                         title: isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)",
                         helpRequest: .sanitizer(.free),
                         presentedHelp: $presentedHelp,
+                        systemImage: "drop.fill",
                         placeholder: freeSanitizerPlaceholder,
                         text: $sanitizerFree
                     )
@@ -100,22 +114,29 @@ struct DailyLogFormView: View {
                             title: "Combined chlorine (ppm)",
                             helpRequest: .sanitizer(.combined),
                             presentedHelp: $presentedHelp,
+                            systemImage: "drop.triangle",
                             placeholder: "0.0-0.5",
                             text: $sanitizerCombined
                         )
                     }
                 }
-            } header: {
-                Text("Chemical readings")
-            }
 
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
-                    addedChemicalField(title: "\(sanitizerName) added (\(weightUnit))", text: $addedSanitizer)
+                AppFormScreenSection(
+                    title: "Chemicals added",
+                    helpRequest: HelpSheetRequest(topic: .chemicalsAdded),
+                    presentedHelp: $presentedHelp
+                ) {
+                    AppSimpleMetricField(
+                        title: "\(sanitizerName) added (\(weightUnit))",
+                        systemImage: "bolt.fill",
+                        placeholder: "0.0 \(weightUnit)",
+                        text: $addedSanitizer
+                    )
                     AppLabeledFormField(
                         title: "pH Down added (\(weightUnit))",
                         helpRequest: .ph(.down),
                         presentedHelp: $presentedHelp,
+                        systemImage: "arrow.down.right",
                         placeholder: "0.0 \(weightUnit)",
                         text: $addedPhDown
                     )
@@ -123,25 +144,26 @@ struct DailyLogFormView: View {
                         title: "pH Up added (\(weightUnit))",
                         helpRequest: .ph(.up),
                         presentedHelp: $presentedHelp,
+                        systemImage: "arrow.up.right",
                         placeholder: "0.0 \(weightUnit)",
                         text: $addedPhUp
                     )
                 }
-            } header: {
-                AppFormSectionHeader(
-                    title: "Chemicals added",
-                    helpRequest: HelpSheetRequest(topic: .chemicalsAdded),
-                    presentedHelp: $presentedHelp
-                )
-            }
 
-            Section {
-                TextField("Notes", text: $notes, axis: .vertical)
-                    .lineLimit(3 ... 6)
+                AppFormScreenSection(title: "Notes", presentedHelp: $presentedHelp) {
+                    TextField("Optional notes", text: $notes, axis: .vertical)
+                        .lineLimit(3 ... 6)
+                        .font(.body)
+                        .foregroundStyle(palette.color(.textPrimary))
+                        .frame(minHeight: 88, alignment: .topLeading)
+                }
             }
+            .padding(.horizontal, AppSpacing.screenHorizontal)
+            .padding(.top, AppSpacing.screenTop)
+            .padding(.bottom, AppSpacing.screenBottom)
         }
-        .scrollContentBackground(.hidden)
-        .background(palette.color(.backgroundSecondary))
+        .scrollDismissesKeyboard(.interactively)
+        .appGroupedScreenBackground(palette)
         .navigationTitle(existing == nil ? "Daily log" : "Edit daily log")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -175,17 +197,6 @@ struct DailyLogFormView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage ?? "")
-        }
-    }
-
-    @ViewBuilder
-    private func addedChemicalField(title: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(palette.color(.textSecondary))
-            TextField("0.0 \(weightUnit)", text: text)
-                .keyboardType(.decimalPad)
         }
     }
 

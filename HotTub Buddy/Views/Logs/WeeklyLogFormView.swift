@@ -67,19 +67,25 @@ struct WeeklyLogFormView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                DatePicker("Date & time", selection: $loggedAt, displayedComponents: [.date, .hourAndMinute])
-            } header: {
-                Text("When")
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.section) {
+                AppFormScreenSection(title: "When", presentedHelp: $presentedHelp) {
+                    DatePicker(
+                        "Date & time",
+                        selection: $loggedAt,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
+                AppFormScreenSection(title: "Water chemistry", presentedHelp: $presentedHelp) {
                     AppLabeledFormField(
                         title: "Combined \(sanitizerName.lowercased()) (ppm)",
                         helpRequest: .sanitizer(.combined),
                         presentedHelp: $presentedHelp,
+                        systemImage: "drop.triangle",
                         placeholder: "0.0-0.5",
                         text: $combined
                     )
@@ -87,6 +93,7 @@ struct WeeklyLogFormView: View {
                         title: "Total \(sanitizerName.lowercased()) (ppm)",
                         helpRequest: .sanitizer(.total),
                         presentedHelp: $presentedHelp,
+                        systemImage: "drop.fill",
                         placeholder: isBromine ? "3.0-5.0" : "1.0-3.0",
                         text: $total
                     )
@@ -94,6 +101,7 @@ struct WeeklyLogFormView: View {
                         title: "Total alkalinity (ppm)",
                         helpRequest: HelpSheetRequest(topic: .alkalinity),
                         presentedHelp: $presentedHelp,
+                        systemImage: "aqi.medium",
                         placeholder: "80-120",
                         text: $alkalinity
                     )
@@ -101,25 +109,51 @@ struct WeeklyLogFormView: View {
                         title: "Copper (ppm)",
                         helpRequest: HelpSheetRequest(topic: .copper),
                         presentedHelp: $presentedHelp,
+                        systemImage: "circle.hexagongrid",
                         placeholder: "0.0-0.3",
                         text: $copper
                     )
                 }
-            } header: {
-                Text("Water chemistry")
-            }
 
-            Section {
-                TextField("Water clarity", text: $waterClarity, axis: .vertical)
-                    .lineLimit(1 ... 3)
-                Toggle("Foam present", isOn: $foamPresent)
-            } header: {
-                Text("Appearance")
-            }
+                AppFormScreenSection(title: "Appearance", presentedHelp: $presentedHelp) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Water clarity")
+                            .font(.subheadline)
+                            .foregroundStyle(palette.color(.textSecondary))
+                        TextField("Clear, cloudy, etc.", text: $waterClarity, axis: .vertical)
+                            .lineLimit(1 ... 3)
+                            .font(.body)
+                            .foregroundStyle(palette.color(.textPrimary))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(minHeight: 50, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(palette.color(.backgroundSecondary))
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .strokeBorder(palette.color(.separator).opacity(0.5), lineWidth: 1)
+                            }
+                    }
+                    Toggle("Foam present", isOn: $foamPresent)
+                        .font(.body)
+                        .tint(palette.color(.accentBlue))
+                        .padding(.top, 4)
+                }
 
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
-                    adjustmentField(title: "Shock added (\(weightUnit))", text: $shock)
+                AppFormScreenSection(
+                    title: "Shock & adjustments",
+                    helpRequest: HelpSheetRequest(topic: .shock),
+                    presentedHelp: $presentedHelp
+                ) {
+                    AppSimpleMetricField(
+                        title: "Shock added (\(weightUnit))",
+                        systemImage: "bolt.fill",
+                        placeholder: "0.0 \(weightUnit)",
+                        text: $shock
+                    )
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Shock type")
                             .font(.subheadline)
@@ -130,31 +164,46 @@ struct WeeklyLogFormView: View {
                                 Text(label).tag(value)
                             }
                         }
+                        .pickerStyle(.menu)
                         .labelsHidden()
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(palette.color(.textPrimary))
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 50)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(palette.color(.backgroundSecondary))
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(palette.color(.separator).opacity(0.5), lineWidth: 1)
+                        }
                     }
                     AppLabeledFormField(
                         title: "Alkalinity Up added (\(weightUnit))",
                         helpRequest: HelpSheetRequest(topic: .alkalinity),
                         presentedHelp: $presentedHelp,
+                        systemImage: "arrow.up.circle",
                         placeholder: "0.0 \(weightUnit)",
                         text: $alkUp
                     )
                 }
-            } header: {
-                AppFormSectionHeader(
-                    title: "Shock & adjustments",
-                    helpRequest: HelpSheetRequest(topic: .shock),
-                    presentedHelp: $presentedHelp
-                )
-            }
 
-            Section {
-                TextField("Notes", text: $notes, axis: .vertical)
-                    .lineLimit(3 ... 6)
+                AppFormScreenSection(title: "Notes", presentedHelp: $presentedHelp) {
+                    TextField("Optional notes", text: $notes, axis: .vertical)
+                        .lineLimit(3 ... 6)
+                        .font(.body)
+                        .foregroundStyle(palette.color(.textPrimary))
+                        .frame(minHeight: 88, alignment: .topLeading)
+                }
             }
+            .padding(.horizontal, AppSpacing.screenHorizontal)
+            .padding(.top, AppSpacing.screenTop)
+            .padding(.bottom, AppSpacing.screenBottom)
         }
-        .scrollContentBackground(.hidden)
-        .background(palette.color(.backgroundSecondary))
+        .scrollDismissesKeyboard(.interactively)
+        .appGroupedScreenBackground(palette)
         .navigationTitle(existing == nil ? "Weekly check" : "Edit weekly check")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -188,17 +237,6 @@ struct WeeklyLogFormView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage ?? "")
-        }
-    }
-
-    @ViewBuilder
-    private func adjustmentField(title: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(palette.color(.textSecondary))
-            TextField("0.0 \(weightUnit)", text: text)
-                .keyboardType(.decimalPad)
         }
     }
 

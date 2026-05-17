@@ -216,6 +216,96 @@ struct AppInfoButton: View {
     }
 }
 
+// MARK: - Form fields (card-style inputs)
+
+struct AppMetricInputBox: View {
+    var systemImage: String?
+    let placeholder: String
+    @Binding var text: String
+
+    @Environment(\.appPalette) private var palette
+
+    private let fieldRadius: CGFloat = 14
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(palette.color(.accentBlue))
+                    .frame(width: 24, alignment: .center)
+            }
+            TextField(placeholder, text: $text)
+                .keyboardType(.decimalPad)
+                .font(.body.weight(text.trimmingCharacters(in: .whitespaces).isEmpty ? .regular : .semibold))
+                .foregroundStyle(
+                    palette.color(
+                        text.trimmingCharacters(in: .whitespaces).isEmpty ? .textTertiary : .textPrimary
+                    )
+                )
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 50)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
+                .fill(palette.color(.backgroundSecondary))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
+                .strokeBorder(palette.color(.separator).opacity(0.5), lineWidth: 1)
+        }
+    }
+}
+
+struct AppFormScreenSection<Content: View>: View {
+    let title: String
+    var helpRequest: HelpSheetRequest?
+    @Binding var presentedHelp: HelpSheetRequest?
+    @ViewBuilder let content: () -> Content
+
+    @Environment(\.appPalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.control) {
+            if let helpRequest {
+                AppFormSectionHeader(
+                    title: title,
+                    helpRequest: helpRequest,
+                    presentedHelp: $presentedHelp
+                )
+            } else {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(palette.color(.textPrimary))
+            }
+
+            VStack(alignment: .leading, spacing: AppSpacing.stack) {
+                content()
+            }
+            .appCard(palette: palette)
+        }
+    }
+}
+
+struct AppSimpleMetricField: View {
+    let title: String
+    var systemImage: String?
+    let placeholder: String
+    @Binding var text: String
+
+    @Environment(\.appPalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(palette.color(.textSecondary))
+            AppMetricInputBox(systemImage: systemImage, placeholder: placeholder, text: $text)
+        }
+    }
+}
+
 // MARK: - Help topic sheet (React HelpModal per-field buttons)
 
 struct AppHelpTopicButton: View {
@@ -280,14 +370,14 @@ struct AppLabeledFormField: View {
     let title: String
     let helpRequest: HelpSheetRequest
     @Binding var presentedHelp: HelpSheetRequest?
+    var systemImage: String?
     var placeholder: String = ""
     @Binding var text: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             AppFormFieldLabel(title: title, helpRequest: helpRequest, presentedHelp: $presentedHelp)
-            TextField(placeholder, text: $text)
-                .keyboardType(.decimalPad)
+            AppMetricInputBox(systemImage: systemImage, placeholder: placeholder, text: $text)
         }
     }
 }
