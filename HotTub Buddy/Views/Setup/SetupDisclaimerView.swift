@@ -58,7 +58,7 @@ struct SetupDisclaimerView: View {
             Text("This is a ")
             + Text("free, non-commercial informational app").bold()
             + Text(
-                " provided by Curley Brackets Engineering Ltd for tracking and reference purposes only. It does not provide professional advice and does not replace manufacturer instructions or professional services."
+                " Provided by Curley Brackets Engineering Ltd for tracking and reference purposes only. It does not provide professional advice and does not replace manufacturer instructions or professional services."
             )
         )
         .font(.subheadline)
