@@ -109,7 +109,7 @@ struct DisclaimerScrollContent: View {
                     "This app is for data-logging purposes only. It does not provide medical, safety, or chemical advice. The user is solely responsible for verifying chemical levels and ensuring the safety of their water."
                 )
                 Text(
-                    "This is a free, non-commercial informational app provided by Curley Brackets Engineering Ltd for tracking and reference purposes only. It does not provide professional advice and does not replace manufacturer instructions or professional services."
+                    "This app does not provide professional advice and does not replace manufacturer instructions or professional services."
                 )
             }
 
