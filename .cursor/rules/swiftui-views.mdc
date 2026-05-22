@@ -1,14 +1,13 @@
 ---
 description: SwiftUI view implementation patterns (Documents/ui applied in HotTub)
 globs:
-  - "HotTub Buddy/**/*.swift"
-  - "HotTub/**/*.swift"
+  - "Sources/**/*.swift"
 alwaysApply: false
 ---
 
-# SwiftUI views (HotTub)
+# SwiftUI views (HotTub Buddy)
 
-Applies when editing Swift under `HotTub Buddy/` or `HotTub/`. Full system: `~/Documents/ui/` + always-on rule `ios-design-system`.
+Applies when editing Swift under `Sources/`. Full system: `~/Documents/ui/` + always-on rule `ios-design-system`.
 
 ## Screen skeleton
 

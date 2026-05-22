@@ -1,13 +1,13 @@
 //
-//  HotTubApp.swift
-//  HotTub
+//  HotTubBuddyApp.swift
+//  HotTub Buddy
 //
 
 import SwiftData
 import SwiftUI
 
 @main
-struct HotTubApp: App {
+struct HotTubBuddyApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

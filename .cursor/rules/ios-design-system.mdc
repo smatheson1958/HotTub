@@ -36,7 +36,7 @@ Calm, spacious, premium, touch-friendly (Health / Fitness / Things / Flighty). A
 
 ## Colors (this project)
 
-Use **`AppPalette`** via `@Environment(\.appPalette)` and `PaletteToken` — do not sprinkle raw `Color(hex:)` in views. Semantic tokens live in `HotTub Buddy/Theme/AppPalette.swift` (keep `HotTub/Theme/AppPalette.swift` in sync if both targets are active).
+Use **`AppPalette`** via `@Environment(\.appPalette)` and `PaletteToken` — do not sprinkle raw `Color(hex:)` in views. Semantic tokens live in `Sources/Theme/AppPalette.swift`.
 
 ## Typography
 
