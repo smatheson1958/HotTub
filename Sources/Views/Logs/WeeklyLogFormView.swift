@@ -40,6 +40,9 @@ struct WeeklyLogFormView: View {
     @State private var alertMessage: String?
     @State private var showAlert = false
     @State private var presentedHelp: HelpSheetRequest?
+    @State private var draftRecord: WeeklyCheckLog?
+    @State private var autoSaveScheduler = FormAutoSaveScheduler()
+    @State private var skipAutoSave = true
     @Query private var settingsRows: [AppSettings]
 
     init(existing: WeeklyCheckLog? = nil) {
@@ -87,7 +90,8 @@ struct WeeklyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "drop.triangle",
                         placeholder: "0.0-0.5",
-                        text: $combined
+                        text: $combined,
+                        blurValidator: { FormValidation.blurRangeError(for: $0, min: 0, max: 50) }
                     )
                     AppLabeledFormField(
                         title: "Total \(sanitizerName.lowercased()) (ppm)",
@@ -95,7 +99,8 @@ struct WeeklyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "drop.fill",
                         placeholder: isBromine ? "3.0-5.0" : "1.0-3.0",
-                        text: $total
+                        text: $total,
+                        blurValidator: { FormValidation.blurRangeError(for: $0, min: 0, max: 50) }
                     )
                     AppLabeledFormField(
                         title: "Total alkalinity (ppm)",
@@ -103,7 +108,8 @@ struct WeeklyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "aqi.medium",
                         placeholder: "80-120",
-                        text: $alkalinity
+                        text: $alkalinity,
+                        blurValidator: { FormValidation.blurRangeError(for: $0, min: 0, max: 300) }
                     )
                     AppLabeledFormField(
                         title: "Copper (ppm)",
@@ -111,7 +117,8 @@ struct WeeklyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "circle.hexagongrid",
                         placeholder: "0.0-0.3",
-                        text: $copper
+                        text: $copper,
+                        blurValidator: { FormValidation.blurRangeError(for: $0, min: 0, max: 5) }
                     )
                 }
 
@@ -120,22 +127,10 @@ struct WeeklyLogFormView: View {
                         Text("Water clarity")
                             .font(.subheadline)
                             .foregroundStyle(palette.color(.textSecondary))
-                        TextField("Clear, cloudy, etc.", text: $waterClarity, axis: .vertical)
-                            .lineLimit(1 ... 3)
-                            .font(.body)
-                            .foregroundStyle(palette.color(.textPrimary))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .frame(minHeight: 50, alignment: .topLeading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(palette.color(.backgroundSecondary))
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(palette.color(.separator).opacity(0.5), lineWidth: 1)
-                            }
+                        AppFormCardTextField(
+                            placeholder: "Clear, cloudy, etc.",
+                            text: $waterClarity
+                        )
                     }
                     Toggle("Foam present", isOn: $foamPresent)
                         .font(.body)
@@ -152,7 +147,8 @@ struct WeeklyLogFormView: View {
                         title: "Shock added (\(weightUnit))",
                         systemImage: "bolt.fill",
                         placeholder: "0.0 \(weightUnit)",
-                        text: $shock
+                        text: $shock,
+                        blurValidator: FormValidation.blurNonNegativeError
                     )
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Shock type")
@@ -186,16 +182,13 @@ struct WeeklyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "arrow.up.circle",
                         placeholder: "0.0 \(weightUnit)",
-                        text: $alkUp
+                        text: $alkUp,
+                        blurValidator: FormValidation.blurNonNegativeError
                     )
                 }
 
                 AppFormScreenSection(title: "Notes", presentedHelp: $presentedHelp) {
-                    TextField("Optional notes", text: $notes, axis: .vertical)
-                        .lineLimit(3 ... 6)
-                        .font(.body)
-                        .foregroundStyle(palette.color(.textPrimary))
-                        .frame(minHeight: 88, alignment: .topLeading)
+                    AppFormNotesField(text: $notes)
                 }
             }
             .padding(.horizontal, AppSpacing.screenHorizontal)
@@ -208,9 +201,9 @@ struct WeeklyLogFormView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { save() }
+                Button("Done") { finish() }
             }
-            if existing != nil {
+            if activeRecord != nil {
                 ToolbarItem(placement: .destructiveAction) {
                     Button("Delete", role: .destructive) { deleteLog() }
                 }
@@ -232,6 +225,15 @@ struct WeeklyLogFormView: View {
                 foamPresent = e.foamPresent
                 notes = e.notes ?? ""
             }
+            skipAutoSave = false
+        }
+        .onChange(of: formSnapshot) { _, _ in scheduleAutoSave() }
+        .onDisappear {
+            autoSaveScheduler.flush { persistDraft() }
+            if existing == nil, let draft = draftRecord, isEmptyDraft(draft) {
+                modelContext.delete(draft)
+                try? modelContext.save()
+            }
         }
         .alert("Cannot save", isPresented: $showAlert) {
             Button("OK", role: .cancel) {}
@@ -240,7 +242,79 @@ struct WeeklyLogFormView: View {
         }
     }
 
-    private func save() {
+    private var activeRecord: WeeklyCheckLog? {
+        existing ?? draftRecord
+    }
+
+    private var formSnapshot: WeeklyFormSnapshot {
+        WeeklyFormSnapshot(
+            loggedAt: loggedAt,
+            combined: combined,
+            total: total,
+            alkalinity: alkalinity,
+            copper: copper,
+            shock: shock,
+            shockType: shockType,
+            alkUp: alkUp,
+            waterClarity: waterClarity,
+            foamPresent: foamPresent,
+            notes: notes
+        )
+    }
+
+    private var hasDraftContent: Bool {
+        !combined.trimmingCharacters(in: .whitespaces).isEmpty
+            || !total.trimmingCharacters(in: .whitespaces).isEmpty
+            || !alkalinity.trimmingCharacters(in: .whitespaces).isEmpty
+            || !copper.trimmingCharacters(in: .whitespaces).isEmpty
+            || !shock.trimmingCharacters(in: .whitespaces).isEmpty
+            || !alkUp.trimmingCharacters(in: .whitespaces).isEmpty
+            || !notes.trimmingCharacters(in: .whitespaces).isEmpty
+            || !waterClarity.trimmingCharacters(in: .whitespaces).isEmpty
+            || foamPresent
+            || !shockType.isEmpty
+    }
+
+    private func scheduleAutoSave() {
+        guard !skipAutoSave else { return }
+        autoSaveScheduler.schedule { persistDraft() }
+    }
+
+    @discardableResult
+    private func persistDraft() -> Bool {
+        guard existing != nil || hasDraftContent else { return true }
+
+        let shockVal = FormFieldParsing.nonNegativeDouble(from: shock)
+        let record: WeeklyCheckLog
+        if let existing {
+            record = existing
+        } else if let draftRecord {
+            record = draftRecord
+        } else {
+            let log = WeeklyCheckLog(
+                loggedAt: loggedAt,
+                combinedChlorine: FormFieldParsing.optionalDouble(from: combined),
+                sanitizerTotal: FormFieldParsing.optionalDouble(from: total),
+                totalAlkalinity: FormFieldParsing.optionalDouble(from: alkalinity),
+                copper: FormFieldParsing.optionalDouble(from: copper),
+                shockAdded: shockVal,
+                shockType: shockType,
+                alkalinityUpAdded: FormFieldParsing.nonNegativeDouble(from: alkUp),
+                notes: notes.isEmpty ? nil : notes,
+                waterClarity: waterClarity.trimmingCharacters(in: .whitespaces),
+                foamPresent: foamPresent
+            )
+            modelContext.insert(log)
+            draftRecord = log
+            record = log
+        }
+
+        apply(to: record, shockVal: shockVal)
+        try? modelContext.save()
+        return true
+    }
+
+    private func finish() {
         let errs = FormValidation.validateWeekly(
             loggedAt: loggedAt,
             combined: combined,
@@ -260,44 +334,63 @@ struct WeeklyLogFormView: View {
             return
         }
 
-        let shockVal = Double(shock.trimmingCharacters(in: .whitespaces)) ?? 0
-
-        if let e = existing {
-            e.loggedAt = loggedAt
-            e.combinedChlorine = Double(combined.trimmingCharacters(in: .whitespaces))
-            e.sanitizerTotal = Double(total.trimmingCharacters(in: .whitespaces))
-            e.totalAlkalinity = Double(alkalinity.trimmingCharacters(in: .whitespaces))
-            e.copper = Double(copper.trimmingCharacters(in: .whitespaces))
-            e.shockAdded = shockVal
-            e.shockType = shockType
-            e.alkalinityUpAdded = Double(alkUp.trimmingCharacters(in: .whitespaces)) ?? 0
-            e.waterClarity = waterClarity.trimmingCharacters(in: .whitespaces)
-            e.foamPresent = foamPresent
-            e.notes = notes.isEmpty ? nil : notes
-        } else {
-            let log = WeeklyCheckLog(
-                loggedAt: loggedAt,
-                combinedChlorine: Double(combined.trimmingCharacters(in: .whitespaces)),
-                sanitizerTotal: Double(total.trimmingCharacters(in: .whitespaces)),
-                totalAlkalinity: Double(alkalinity.trimmingCharacters(in: .whitespaces)),
-                copper: Double(copper.trimmingCharacters(in: .whitespaces)),
-                shockAdded: shockVal,
-                shockType: shockType,
-                alkalinityUpAdded: Double(alkUp.trimmingCharacters(in: .whitespaces)) ?? 0,
-                notes: notes.isEmpty ? nil : notes,
-                waterClarity: waterClarity.trimmingCharacters(in: .whitespaces),
-                foamPresent: foamPresent
-            )
-            modelContext.insert(log)
-        }
-        try? modelContext.save()
+        autoSaveScheduler.flush { persistDraft() }
         dismiss()
+    }
+
+    private func apply(to record: WeeklyCheckLog, shockVal: Double) {
+        record.loggedAt = loggedAt
+        if combined.trimmingCharacters(in: .whitespaces).isEmpty || FormFieldParsing.optionalDouble(from: combined) != nil {
+            record.combinedChlorine = FormFieldParsing.optionalDouble(from: combined)
+        }
+        if total.trimmingCharacters(in: .whitespaces).isEmpty || FormFieldParsing.optionalDouble(from: total) != nil {
+            record.sanitizerTotal = FormFieldParsing.optionalDouble(from: total)
+        }
+        if alkalinity.trimmingCharacters(in: .whitespaces).isEmpty || FormFieldParsing.optionalDouble(from: alkalinity) != nil {
+            record.totalAlkalinity = FormFieldParsing.optionalDouble(from: alkalinity)
+        }
+        if copper.trimmingCharacters(in: .whitespaces).isEmpty || FormFieldParsing.optionalDouble(from: copper) != nil {
+            record.copper = FormFieldParsing.optionalDouble(from: copper)
+        }
+        record.shockAdded = shockVal
+        record.shockType = shockType
+        record.alkalinityUpAdded = FormFieldParsing.nonNegativeDouble(from: alkUp)
+        record.waterClarity = waterClarity.trimmingCharacters(in: .whitespaces)
+        record.foamPresent = foamPresent
+        record.notes = notes.isEmpty ? nil : notes
+    }
+
+    private func isEmptyDraft(_ record: WeeklyCheckLog) -> Bool {
+        record.combinedChlorine == nil
+            && record.sanitizerTotal == nil
+            && record.totalAlkalinity == nil
+            && record.copper == nil
+            && (record.shockAdded ?? 0) == 0
+            && (record.alkalinityUpAdded ?? 0) == 0
+            && record.shockType.isEmpty
+            && record.waterClarity.isEmpty
+            && !record.foamPresent
+            && (record.notes?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
     }
 
     private func deleteLog() {
-        guard let e = existing else { return }
-        modelContext.delete(e)
+        guard let record = activeRecord else { return }
+        modelContext.delete(record)
         try? modelContext.save()
         dismiss()
     }
+}
+
+private struct WeeklyFormSnapshot: Equatable {
+    var loggedAt: Date
+    var combined: String
+    var total: String
+    var alkalinity: String
+    var copper: String
+    var shock: String
+    var shockType: String
+    var alkUp: String
+    var waterClarity: String
+    var foamPresent: Bool
+    var notes: String
 }

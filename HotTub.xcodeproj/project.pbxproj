@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 4A0137FA2F7D72650083E219 /* Build configuration list for PBXProject "HotTub Buddy" */;
+			buildConfigurationList = 4A0137FA2F7D72650083E219 /* Build configuration list for PBXProject "HotTub" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -315,7 +315,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		4A0137FA2F7D72650083E219 /* Build configuration list for PBXProject "HotTub Buddy" */ = {
+		4A0137FA2F7D72650083E219 /* Build configuration list for PBXProject "HotTub" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4A0138082F7D72660083E219 /* Debug */,

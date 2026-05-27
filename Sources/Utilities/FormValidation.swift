@@ -6,6 +6,26 @@
 import Foundation
 
 enum FormValidation {
+    static let outOfRangeMessage = "Out of validation range"
+
+    /// Inline blur validation for optional numeric range fields (empty is valid).
+    static func blurRangeError(for text: String, min: Double, max: Double) -> String? {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return nil }
+        guard let v = Double(t), !v.isNaN else { return "Must be a number" }
+        if v < min || v > max { return outOfRangeMessage }
+        return nil
+    }
+
+    /// Inline blur validation for optional non-negative numeric fields (empty is valid).
+    static func blurNonNegativeError(for text: String) -> String? {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return nil }
+        guard let v = Double(t), !v.isNaN else { return "Must be a number" }
+        if v < 0 { return outOfRangeMessage }
+        return nil
+    }
+
     static func isFutureDate(ymd: String) -> Bool {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)

@@ -19,6 +19,11 @@ struct UsageLogFormView: View {
 
     @State private var alertMessage: String?
     @State private var showAlert = false
+    @State private var draftRecord: UsageLogEntry?
+    @State private var autoSaveScheduler = FormAutoSaveScheduler()
+    @State private var skipAutoSave = true
+    @State private var baselineNumUsers = 1
+    @State private var baselineDurationMinutes = 15
 
     init(existing: UsageLogEntry? = nil) {
         self.existing = existing
@@ -45,9 +50,9 @@ struct UsageLogFormView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { save() }
+                Button("Done") { finish() }
             }
-            if existing != nil {
+            if activeRecord != nil {
                 ToolbarItem(placement: .destructiveAction) {
                     Button("Delete", role: .destructive) { deleteLog() }
                 }
@@ -59,6 +64,20 @@ struct UsageLogFormView: View {
                 loggedAt = e.loggedAt
                 numUsers = e.numUsers
                 durationMinutes = e.durationMinutes
+                baselineNumUsers = e.numUsers
+                baselineDurationMinutes = e.durationMinutes
+            } else {
+                baselineNumUsers = numUsers
+                baselineDurationMinutes = durationMinutes
+            }
+            skipAutoSave = false
+        }
+        .onChange(of: formSnapshot) { _, _ in scheduleAutoSave() }
+        .onDisappear {
+            autoSaveScheduler.flush { persistDraft() }
+            if existing == nil, let draft = draftRecord, isEmptyDraft(draft) {
+                modelContext.delete(draft)
+                try? modelContext.save()
             }
         }
         .alert("Cannot save", isPresented: $showAlert) {
@@ -68,18 +87,36 @@ struct UsageLogFormView: View {
         }
     }
 
-    private func save() {
-        let errs = FormValidation.validateUsage(loggedAt: loggedAt)
-        if !errs.isEmpty {
-            alertMessage = errs.joined(separator: "\n")
-            showAlert = true
-            return
-        }
+    private var activeRecord: UsageLogEntry? {
+        existing ?? draftRecord
+    }
 
-        if let e = existing {
-            e.loggedAt = loggedAt
-            e.numUsers = numUsers
-            e.durationMinutes = durationMinutes
+    private var formSnapshot: UsageFormSnapshot {
+        UsageFormSnapshot(
+            loggedAt: loggedAt,
+            numUsers: numUsers,
+            durationMinutes: durationMinutes
+        )
+    }
+
+    private var hasDraftContent: Bool {
+        existing != nil || numUsers != baselineNumUsers || durationMinutes != baselineDurationMinutes
+    }
+
+    private func scheduleAutoSave() {
+        guard !skipAutoSave else { return }
+        autoSaveScheduler.schedule { persistDraft() }
+    }
+
+    @discardableResult
+    private func persistDraft() -> Bool {
+        guard hasDraftContent else { return true }
+
+        let record: UsageLogEntry
+        if let existing {
+            record = existing
+        } else if let draftRecord {
+            record = draftRecord
         } else {
             let log = UsageLogEntry(
                 loggedAt: loggedAt,
@@ -87,15 +124,43 @@ struct UsageLogFormView: View {
                 durationMinutes: durationMinutes
             )
             modelContext.insert(log)
+            draftRecord = log
+            record = log
         }
+
+        record.loggedAt = loggedAt
+        record.numUsers = numUsers
+        record.durationMinutes = durationMinutes
         try? modelContext.save()
+        return true
+    }
+
+    private func finish() {
+        let errs = FormValidation.validateUsage(loggedAt: loggedAt)
+        if !errs.isEmpty {
+            alertMessage = errs.joined(separator: "\n")
+            showAlert = true
+            return
+        }
+
+        autoSaveScheduler.flush { persistDraft() }
         dismiss()
     }
 
+    private func isEmptyDraft(_ record: UsageLogEntry) -> Bool {
+        record.numUsers == baselineNumUsers && record.durationMinutes == baselineDurationMinutes
+    }
+
     private func deleteLog() {
-        guard let e = existing else { return }
-        modelContext.delete(e)
+        guard let record = activeRecord else { return }
+        modelContext.delete(record)
         try? modelContext.save()
         dismiss()
     }
+}
+
+private struct UsageFormSnapshot: Equatable {
+    var loggedAt: Date
+    var numUsers: Int
+    var durationMinutes: Int
 }

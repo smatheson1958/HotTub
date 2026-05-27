@@ -82,10 +82,12 @@ struct HistoryView: View {
             HStack(spacing: AppSpacing.control) {
                 AppFilterChip(title: "Daily", isOn: $filterDaily)
                 AppFilterChip(title: "Weekly", isOn: $filterWeekly)
-                AppFilterChip(title: "Maintenance", isOn: $filterMaintenance)
+                AppFilterChip(title: "Maint.", isOn: $filterMaintenance)
                 AppFilterChip(title: "Usage", isOn: $filterUsage)
             }
+            .padding(.horizontal, AppSpacing.screenHorizontal)
         }
+        .padding(.horizontal, -AppSpacing.screenHorizontal)
     }
 
     private func historyRowLink(_ row: HistoryRow) -> some View {
@@ -194,19 +196,19 @@ private struct HistoryRowView: View {
                     Text(timeString(row.sortMoment))
                 }
                 .font(.caption)
-                .foregroundStyle(palette.color(.textSecondary))
+                .foregroundStyle(palette.color(.textPrimary).opacity(0.75))
 
                 if case .daily(let log) = row {
                     HStack(spacing: 10) {
                         if let ph = log.ph {
                             Text("pH \(String(format: "%.1f", ph))")
                                 .font(.caption)
-                                .foregroundStyle(phWarning(log) ? palette.color(.accentOrange) : palette.color(.textTertiary))
+                                .foregroundStyle(phWarning(log) ? palette.color(.accentOrange) : palette.color(.textSecondary))
                         }
                         if let ppm = log.primarySanitizerPpm {
                             Text("\(isBromine ? "BR" : "FC") \(String(format: "%.1f", ppm))")
                                 .font(.caption)
-                                .foregroundStyle(sanitizerWarning(log) ? palette.color(.accentOrange) : palette.color(.textTertiary))
+                                .foregroundStyle(sanitizerWarning(log) ? palette.color(.accentOrange) : palette.color(.textSecondary))
                         }
                     }
                 }

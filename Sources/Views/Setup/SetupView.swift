@@ -5,6 +5,7 @@
 
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SetupView: View {
     @Environment(\.modelContext) private var modelContext
@@ -34,11 +35,18 @@ private struct SetupSettingsForm: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appPalette) private var palette
 
+    @State private var showImporter = false
+    @State private var exportBackupFile: CSVBackupExportFile?
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+    @State private var showAlert = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.section) {
                 hotTubSection
                 volumeSection
+                dataSection
                 legalSection
             }
             .padding(.horizontal, AppSpacing.screenHorizontal)
@@ -46,6 +54,24 @@ private struct SetupSettingsForm: View {
             .padding(.bottom, AppSpacing.screenBottom)
         }
         .scrollDismissesKeyboard(.interactively)
+        .sheet(item: $exportBackupFile) { file in
+            CSVFilesExportPresenter(fileURL: file.url) { result in
+                handleExportResult(result, tempURL: file.url)
+            }
+            .ignoresSafeArea()
+        }
+        .fileImporter(
+            isPresented: $showImporter,
+            allowedContentTypes: [.commaSeparatedText],
+            allowsMultipleSelection: false
+        ) { result in
+            importCSV(from: result)
+        }
+        .alert(alertTitle, isPresented: $showAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
+        }
     }
 
     private var hotTubSection: some View {
@@ -57,11 +83,17 @@ private struct SetupSettingsForm: View {
 
             VStack(spacing: 0) {
                 AppSettingsLabeledRow(label: "Capacity") {
-                    TextField("1000", value: $settings.capacity, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 120)
-                        .onChange(of: settings.capacity) { _, _ in touch() }
+                    TextField(
+                        "",
+                        value: $settings.capacity,
+                        format: .number,
+                        prompt: AppFormFieldStyle.prompt("1000", palette: palette)
+                    )
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .appFormFieldTextStyle(palette)
+                    .frame(width: 120)
+                    .onChange(of: settings.capacity) { _, _ in touch() }
                 }
 
                 AppSettingsDivider()
@@ -117,6 +149,34 @@ private struct SetupSettingsForm: View {
         }
     }
 
+    private var dataSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.control) {
+            AppSectionHeader(
+                title: "Data",
+                subtitle: "Save a CSV backup to Files, or import log records from another file"
+            )
+
+            VStack(spacing: 0) {
+                AppSettingsActionRow(
+                    label: "Save CSV backup",
+                    systemImage: "arrow.down.doc"
+                ) {
+                    saveCSVBackup()
+                }
+
+                AppSettingsDivider()
+
+                AppSettingsActionRow(
+                    label: "Import records",
+                    systemImage: "square.and.arrow.down"
+                ) {
+                    showImporter = true
+                }
+            }
+            .appCard(palette: palette, padding: 0)
+        }
+    }
+
     private var legalSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.control) {
             AppSectionHeader(
@@ -132,5 +192,96 @@ private struct SetupSettingsForm: View {
         settings.updatedAt = .now
         settings.temperatureUnit = settings.measurementSystem == "metric" ? "celsius" : "fahrenheit"
         try? modelContext.save()
+    }
+
+    private func saveCSVBackup() {
+        do {
+            let csv = try HotTubCSVService.exportCSV(in: modelContext)
+            let url = try CSVBackupFileWriter.writeTemporaryCSV(
+                text: csv,
+                filename: HotTubCSVService.suggestedExportFilename()
+            )
+            exportBackupFile = CSVBackupExportFile(url: url)
+        } catch {
+            presentAlert(title: "Backup failed", message: error.localizedDescription)
+        }
+    }
+
+    private func handleExportResult(_ result: Result<URL, Error>, tempURL: URL) {
+        exportBackupFile = nil
+        try? FileManager.default.removeItem(at: tempURL)
+
+        switch result {
+        case .success:
+            presentAlert(title: "Backup saved", message: "Your data was saved as a CSV file.")
+        case .failure(let error):
+            if error is CancellationError { return }
+            let nsError = error as NSError
+            if nsError.domain == NSCocoaErrorDomain, nsError.code == NSUserCancelledError { return }
+            presentAlert(title: "Backup failed", message: error.localizedDescription)
+        }
+    }
+
+    private func importCSV(from result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            if error is CancellationError { return }
+            presentAlert(title: "Import failed", message: error.localizedDescription)
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            guard url.startAccessingSecurityScopedResource() else {
+                presentAlert(title: "Import failed", message: HotTubCSVError.unreadable.errorDescription ?? "Could not open the file.")
+                return
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+
+            do {
+                let data = try Data(contentsOf: url)
+                let text = String(decoding: data, as: UTF8.self)
+                let importResult = try HotTubCSVService.importCSV(text, in: modelContext)
+                presentAlert(title: "Import complete", message: importResult.summary)
+            } catch {
+                presentAlert(title: "Import failed", message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func presentAlert(title: String, message: String) {
+        alertTitle = title
+        alertMessage = message
+        showAlert = true
+    }
+}
+
+private struct CSVBackupExportFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct AppSettingsActionRow: View {
+    let label: String
+    let systemImage: String
+    var isDisabled = false
+    let action: () -> Void
+
+    @Environment(\.appPalette) private var palette
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(label)
+                    .font(.body)
+                    .foregroundStyle(palette.color(.textPrimary))
+                Spacer(minLength: 16)
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(palette.color(.accentBlue))
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: AppSpacing.minTap)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
     }
 }

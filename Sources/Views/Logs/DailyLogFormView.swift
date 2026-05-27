@@ -26,6 +26,9 @@ struct DailyLogFormView: View {
     @State private var alertMessage: String?
     @State private var showAlert = false
     @State private var presentedHelp: HelpSheetRequest?
+    @State private var draftRecord: HotTubDailyLog?
+    @State private var autoSaveScheduler = FormAutoSaveScheduler()
+    @State private var skipAutoSave = true
     @Query private var settingsRows: [AppSettings]
 
     private var isCelsius: Bool {
@@ -99,7 +102,8 @@ struct DailyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "flask",
                         placeholder: "7.2-7.8",
-                        text: $ph
+                        text: $ph,
+                        blurValidator: { FormValidation.blurRangeError(for: $0, min: 0, max: 14) }
                     )
                     AppLabeledFormField(
                         title: isBromine ? "Bromine (ppm)" : "Free chlorine (ppm)",
@@ -107,7 +111,8 @@ struct DailyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "drop.fill",
                         placeholder: freeSanitizerPlaceholder,
-                        text: $sanitizerFree
+                        text: $sanitizerFree,
+                        blurValidator: { FormValidation.blurRangeError(for: $0, min: 0, max: 20) }
                     )
                     if !isBromine {
                         AppLabeledFormField(
@@ -116,7 +121,8 @@ struct DailyLogFormView: View {
                             presentedHelp: $presentedHelp,
                             systemImage: "drop.triangle",
                             placeholder: "0.0-0.5",
-                            text: $sanitizerCombined
+                            text: $sanitizerCombined,
+                            blurValidator: { FormValidation.blurRangeError(for: $0, min: 0, max: 20) }
                         )
                     }
                 }
@@ -130,7 +136,8 @@ struct DailyLogFormView: View {
                         title: "\(sanitizerName) added (\(weightUnit))",
                         systemImage: "bolt.fill",
                         placeholder: "0.0 \(weightUnit)",
-                        text: $addedSanitizer
+                        text: $addedSanitizer,
+                        blurValidator: FormValidation.blurNonNegativeError
                     )
                     AppLabeledFormField(
                         title: "pH Down added (\(weightUnit))",
@@ -138,7 +145,8 @@ struct DailyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "arrow.down.right",
                         placeholder: "0.0 \(weightUnit)",
-                        text: $addedPhDown
+                        text: $addedPhDown,
+                        blurValidator: FormValidation.blurNonNegativeError
                     )
                     AppLabeledFormField(
                         title: "pH Up added (\(weightUnit))",
@@ -146,16 +154,13 @@ struct DailyLogFormView: View {
                         presentedHelp: $presentedHelp,
                         systemImage: "arrow.up.right",
                         placeholder: "0.0 \(weightUnit)",
-                        text: $addedPhUp
+                        text: $addedPhUp,
+                        blurValidator: FormValidation.blurNonNegativeError
                     )
                 }
 
                 AppFormScreenSection(title: "Notes", presentedHelp: $presentedHelp) {
-                    TextField("Optional notes", text: $notes, axis: .vertical)
-                        .lineLimit(3 ... 6)
-                        .font(.body)
-                        .foregroundStyle(palette.color(.textPrimary))
-                        .frame(minHeight: 88, alignment: .topLeading)
+                    AppFormNotesField(text: $notes)
                 }
             }
             .padding(.horizontal, AppSpacing.screenHorizontal)
@@ -168,9 +173,9 @@ struct DailyLogFormView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { save() }
+                Button("Done") { finish() }
             }
-            if existing != nil {
+            if activeRecord != nil {
                 ToolbarItem(placement: .destructiveAction) {
                     Button("Delete", role: .destructive) { deleteLog() }
                 }
@@ -192,6 +197,15 @@ struct DailyLogFormView: View {
             } else {
                 waterTemp = isCelsius ? 37 : 98
             }
+            skipAutoSave = false
+        }
+        .onChange(of: formSnapshot) { _, _ in scheduleAutoSave() }
+        .onDisappear {
+            autoSaveScheduler.flush { persistDraft() }
+            if existing == nil, let draft = draftRecord, isEmptyDraft(draft) {
+                modelContext.delete(draft)
+                try? modelContext.save()
+            }
         }
         .alert("Cannot save", isPresented: $showAlert) {
             Button("OK", role: .cancel) {}
@@ -200,7 +214,75 @@ struct DailyLogFormView: View {
         }
     }
 
-    private func save() {
+    private var activeRecord: HotTubDailyLog? {
+        existing ?? draftRecord
+    }
+
+    private var formSnapshot: DailyFormSnapshot {
+        DailyFormSnapshot(
+            loggedAt: loggedAt,
+            waterTemp: waterTemp,
+            ph: ph,
+            sanitizerFree: sanitizerFree,
+            sanitizerCombined: sanitizerCombined,
+            addedSanitizer: addedSanitizer,
+            addedPhUp: addedPhUp,
+            addedPhDown: addedPhDown,
+            notes: notes
+        )
+    }
+
+    private var hasDraftContent: Bool {
+        !ph.trimmingCharacters(in: .whitespaces).isEmpty
+            || !sanitizerFree.trimmingCharacters(in: .whitespaces).isEmpty
+            || !sanitizerCombined.trimmingCharacters(in: .whitespaces).isEmpty
+            || !addedSanitizer.trimmingCharacters(in: .whitespaces).isEmpty
+            || !addedPhUp.trimmingCharacters(in: .whitespaces).isEmpty
+            || !addedPhDown.trimmingCharacters(in: .whitespaces).isEmpty
+            || !notes.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func scheduleAutoSave() {
+        guard !skipAutoSave else { return }
+        autoSaveScheduler.schedule { persistDraft() }
+    }
+
+    @discardableResult
+    private func persistDraft() -> Bool {
+        guard existing != nil || hasDraftContent else { return true }
+
+        let phVal = FormFieldParsing.optionalDouble(from: ph)
+        let freeVal = FormFieldParsing.optionalDouble(from: sanitizerFree)
+        let combVal = FormFieldParsing.optionalDouble(from: sanitizerCombined)
+
+        let record: HotTubDailyLog
+        if let existing {
+            record = existing
+        } else if let draftRecord {
+            record = draftRecord
+        } else {
+            let log = HotTubDailyLog(
+                loggedAt: loggedAt,
+                waterTemperature: waterTemp,
+                ph: phVal,
+                sanitizerFree: freeVal,
+                sanitizerCombined: combVal,
+                addedPhUp: FormFieldParsing.nonNegativeDouble(from: addedPhUp),
+                addedPhDown: FormFieldParsing.nonNegativeDouble(from: addedPhDown),
+                addedSanitizer: FormFieldParsing.nonNegativeDouble(from: addedSanitizer),
+                notes: notes.isEmpty ? nil : notes
+            )
+            modelContext.insert(log)
+            draftRecord = log
+            record = log
+        }
+
+        apply(to: record, phVal: phVal, freeVal: freeVal, combVal: combVal)
+        try? modelContext.save()
+        return true
+    }
+
+    private func finish() {
         let errs = FormValidation.validateDailyLog(
             loggedAt: loggedAt,
             ph: ph,
@@ -218,46 +300,54 @@ struct DailyLogFormView: View {
             return
         }
 
-        let phVal = Double(ph.trimmingCharacters(in: .whitespaces))
-        let freeVal = Double(sanitizerFree.trimmingCharacters(in: .whitespaces))
-        let combVal = Double(sanitizerCombined.trimmingCharacters(in: .whitespaces))
-
-        if let e = existing {
-            apply(to: e, phVal: phVal, freeVal: freeVal, combVal: combVal)
-        } else {
-            let log = HotTubDailyLog(
-                loggedAt: loggedAt,
-                waterTemperature: waterTemp,
-                ph: phVal,
-                sanitizerFree: freeVal,
-                sanitizerCombined: combVal,
-                addedPhUp: Double(addedPhUp) ?? 0,
-                addedPhDown: Double(addedPhDown) ?? 0,
-                addedSanitizer: Double(addedSanitizer) ?? 0,
-                notes: notes.isEmpty ? nil : notes
-            )
-            modelContext.insert(log)
-        }
-        try? modelContext.save()
+        autoSaveScheduler.flush { persistDraft() }
         dismiss()
     }
 
-    private func apply(to e: HotTubDailyLog, phVal: Double?, freeVal: Double?, combVal: Double?) {
-        e.loggedAt = loggedAt
-        e.waterTemperature = waterTemp
-        e.ph = phVal
-        e.sanitizerFree = freeVal
-        e.sanitizerCombined = combVal
-        e.addedPhUp = Double(addedPhUp) ?? 0
-        e.addedPhDown = Double(addedPhDown) ?? 0
-        e.addedSanitizer = Double(addedSanitizer) ?? 0
-        e.notes = notes.isEmpty ? nil : notes
+    private func apply(to record: HotTubDailyLog, phVal: Double?, freeVal: Double?, combVal: Double?) {
+        record.loggedAt = loggedAt
+        record.waterTemperature = waterTemp
+        if ph.trimmingCharacters(in: .whitespaces).isEmpty || phVal != nil {
+            record.ph = phVal
+        }
+        if sanitizerFree.trimmingCharacters(in: .whitespaces).isEmpty || freeVal != nil {
+            record.sanitizerFree = freeVal
+        }
+        if sanitizerCombined.trimmingCharacters(in: .whitespaces).isEmpty || combVal != nil {
+            record.sanitizerCombined = combVal
+        }
+        record.addedPhUp = FormFieldParsing.nonNegativeDouble(from: addedPhUp)
+        record.addedPhDown = FormFieldParsing.nonNegativeDouble(from: addedPhDown)
+        record.addedSanitizer = FormFieldParsing.nonNegativeDouble(from: addedSanitizer)
+        record.notes = notes.isEmpty ? nil : notes
+    }
+
+    private func isEmptyDraft(_ record: HotTubDailyLog) -> Bool {
+        record.ph == nil
+            && record.sanitizerFree == nil
+            && record.sanitizerCombined == nil
+            && record.addedSanitizer == 0
+            && record.addedPhUp == 0
+            && record.addedPhDown == 0
+            && (record.notes?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
     }
 
     private func deleteLog() {
-        guard let e = existing else { return }
-        modelContext.delete(e)
+        guard let record = activeRecord else { return }
+        modelContext.delete(record)
         try? modelContext.save()
         dismiss()
     }
+}
+
+private struct DailyFormSnapshot: Equatable {
+    var loggedAt: Date
+    var waterTemp: Int
+    var ph: String
+    var sanitizerFree: String
+    var sanitizerCombined: String
+    var addedSanitizer: String
+    var addedPhUp: String
+    var addedPhDown: String
+    var notes: String
 }

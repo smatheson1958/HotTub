@@ -100,6 +100,9 @@ struct AppEmptyState: View {
 // MARK: - Filter chip
 
 struct AppFilterChip: View {
+    /// Uniform width sized for the "Weekly" label at caption + horizontal inset.
+    private static let uniformWidth: CGFloat = 72
+
     let title: String
     @Binding var isOn: Bool
 
@@ -112,8 +115,10 @@ struct AppFilterChip: View {
             }
         } label: {
             Text(title)
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 16)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(width: Self.uniformWidth)
                 .frame(minHeight: AppSpacing.minTap)
                 .background(isOn ? palette.color(.tagBlueFill) : palette.color(.surfaceCard))
                 .foregroundStyle(isOn ? palette.color(.accentBlue) : palette.color(.textSecondary))
@@ -218,34 +223,61 @@ struct AppInfoButton: View {
 
 // MARK: - Form fields (card-style inputs)
 
-struct AppMetricInputBox: View {
-    var systemImage: String?
+enum AppFormFieldStyle {
+    static func prompt(_ placeholder: String, palette: AppPalette) -> Text {
+        Text(placeholder).foregroundStyle(palette.color(.textTertiary))
+    }
+}
+
+extension View {
+    /// Entered text colour for form `TextField`s (placeholder uses `AppFormFieldStyle.prompt`).
+    func appFormFieldTextStyle(_ palette: AppPalette, weight: Font.Weight = .regular) -> some View {
+        font(.body.weight(weight))
+            .foregroundStyle(palette.color(.textPrimary))
+    }
+}
+
+struct AppFormNotesField: View {
+    @Binding var text: String
+    var placeholder: String = "Optional notes"
+
+    @Environment(\.appPalette) private var palette
+
+    var body: some View {
+        TextField(
+            "",
+            text: $text,
+            prompt: AppFormFieldStyle.prompt(placeholder, palette: palette),
+            axis: .vertical
+        )
+        .lineLimit(3 ... 6)
+        .appFormFieldTextStyle(palette)
+        .frame(minHeight: 88, alignment: .topLeading)
+    }
+}
+
+struct AppFormCardTextField: View {
     let placeholder: String
     @Binding var text: String
+    var lineLimit: ClosedRange<Int> = 1 ... 3
+    var minHeight: CGFloat = 50
 
     @Environment(\.appPalette) private var palette
 
     private let fieldRadius: CGFloat = 14
 
     var body: some View {
-        HStack(spacing: 12) {
-            if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(palette.color(.accentBlue))
-                    .frame(width: 24, alignment: .center)
-            }
-            TextField(placeholder, text: $text)
-                .keyboardType(.decimalPad)
-                .font(.body.weight(text.trimmingCharacters(in: .whitespaces).isEmpty ? .regular : .semibold))
-                .foregroundStyle(
-                    palette.color(
-                        text.trimmingCharacters(in: .whitespaces).isEmpty ? .textTertiary : .textPrimary
-                    )
-                )
-        }
+        TextField(
+            "",
+            text: $text,
+            prompt: AppFormFieldStyle.prompt(placeholder, palette: palette),
+            axis: .vertical
+        )
+        .lineLimit(lineLimit)
+        .appFormFieldTextStyle(palette)
         .padding(.horizontal, 16)
-        .frame(minHeight: 50)
+        .padding(.vertical, 12)
+        .frame(minHeight: minHeight, alignment: .topLeading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
@@ -255,6 +287,82 @@ struct AppMetricInputBox: View {
             RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
                 .strokeBorder(palette.color(.separator).opacity(0.5), lineWidth: 1)
         }
+    }
+}
+
+struct AppMetricInputBox: View {
+    var systemImage: String?
+    let placeholder: String
+    @Binding var text: String
+    var blurValidator: ((String) -> String?)? = nil
+
+    @Environment(\.appPalette) private var palette
+    @FocusState private var isFocused: Bool
+    @State private var errorMessage: String?
+
+    private let fieldRadius: CGFloat = 14
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(palette.color(.accentBlue))
+                        .frame(width: 24, alignment: .center)
+                }
+                TextField(
+                    "",
+                    text: $text,
+                    prompt: AppFormFieldStyle.prompt(placeholder, palette: palette)
+                )
+                .keyboardType(.decimalPad)
+                .focused($isFocused)
+                .appFormFieldTextStyle(
+                    palette,
+                    weight: text.trimmingCharacters(in: .whitespaces).isEmpty ? .regular : .semibold
+                )
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 50)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
+                    .fill(palette.color(.backgroundSecondary))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
+                    .strokeBorder(
+                        errorMessage == nil
+                            ? palette.color(.separator).opacity(0.5)
+                            : palette.color(.statusErrorBorder),
+                        lineWidth: 1
+                    )
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(palette.color(.statusErrorText))
+            }
+        }
+        .onChange(of: isFocused) { _, focused in
+            guard !focused else { return }
+            validateOnBlur()
+        }
+        .onChange(of: text) { _, _ in
+            if isFocused, errorMessage != nil {
+                errorMessage = nil
+            }
+        }
+    }
+
+    private func validateOnBlur() {
+        guard let blurValidator else {
+            errorMessage = nil
+            return
+        }
+        errorMessage = blurValidator(text)
     }
 }
 
@@ -293,6 +401,7 @@ struct AppSimpleMetricField: View {
     var systemImage: String?
     let placeholder: String
     @Binding var text: String
+    var blurValidator: ((String) -> String?)? = nil
 
     @Environment(\.appPalette) private var palette
 
@@ -301,7 +410,12 @@ struct AppSimpleMetricField: View {
             Text(title)
                 .font(.subheadline)
                 .foregroundStyle(palette.color(.textSecondary))
-            AppMetricInputBox(systemImage: systemImage, placeholder: placeholder, text: $text)
+            AppMetricInputBox(
+                systemImage: systemImage,
+                placeholder: placeholder,
+                text: $text,
+                blurValidator: blurValidator
+            )
         }
     }
 }
@@ -373,11 +487,17 @@ struct AppLabeledFormField: View {
     var systemImage: String?
     var placeholder: String = ""
     @Binding var text: String
+    var blurValidator: ((String) -> String?)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             AppFormFieldLabel(title: title, helpRequest: helpRequest, presentedHelp: $presentedHelp)
-            AppMetricInputBox(systemImage: systemImage, placeholder: placeholder, text: $text)
+            AppMetricInputBox(
+                systemImage: systemImage,
+                placeholder: placeholder,
+                text: $text,
+                blurValidator: blurValidator
+            )
         }
     }
 }

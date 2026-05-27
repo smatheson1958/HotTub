@@ -54,12 +54,8 @@ struct SetupDisclaimerView: View {
     }
 
     private var introParagraph: some View {
-        (
-            Text("This is a ")
-            + Text("free, non-commercial informational app").bold()
-            + Text(
-                " Provided by Curley Brackets Engineering Ltd for tracking and reference purposes only. It does not provide professional advice and does not replace manufacturer instructions or professional services."
-            )
+        Text(
+            "This is a **free, non-commercial informational app** Provided by Curley Brackets Engineering Ltd for tracking and reference purposes only. It does not provide professional advice and does not replace manufacturer instructions or professional services."
         )
         .font(.subheadline)
         .foregroundStyle(palette.color(.textPrimary))
@@ -69,16 +65,8 @@ struct SetupDisclaimerView: View {
     private var sectionsCard: some View {
         VStack(alignment: .leading, spacing: AppSpacing.stack) {
             disclaimerSection(title: "Water Chemistry") {
-                (
-                    Text("This app is a ")
-                    + Text("logging and tracking tool").bold()
-                    + Text(" for recording your hot tub maintenance. Any water chemistry values, ranges, or guidance shown are ")
-                    + Text("for reference only").bold()
-                    + Text(
-                        ". The app does not calculate or recommend chemical dosages. Always follow your hot tub or spa manufacturer's guidance and the instructions on chemical products. Users are responsible for "
-                    )
-                    + Text("testing their own water").bold()
-                    + Text(" and making their own decisions about chemical treatment.")
+                Text(
+                    "This app is a **logging and tracking tool** for recording your hot tub maintenance. Any water chemistry values, ranges, or guidance shown are **for reference only**. The app does not calculate or recommend chemical dosages. Always follow your hot tub or spa manufacturer's guidance and the instructions on chemical products. Users are responsible for **testing their own water** and making their own decisions about chemical treatment."
                 )
             }
 
@@ -89,24 +77,14 @@ struct SetupDisclaimerView: View {
             }
 
             disclaimerSection(title: "Local Laws") {
-                (
-                    Text(
-                        "Laws, standards, and recommended practices may vary by country or region. Users are responsible for ensuring compliance with "
-                    )
-                    + Text("local regulations").bold()
-                    + Text(" and manufacturer guidance.")
+                Text(
+                    "Laws, standards, and recommended practices may vary by country or region. Users are responsible for ensuring compliance with **local regulations** and manufacturer guidance."
                 )
             }
 
             disclaimerSection(title: "No Warranty / Limitation of Liability") {
-                (
-                    Text("This app is provided ")
-                    + Text("\"as is\"").bold()
-                    + Text(", without warranties of any kind. To the fullest extent permitted by applicable law, Curley Brackets Engineering Ltd accepts ")
-                    + Text("no liability for loss, damage, or injury").bold()
-                    + Text(" arising from use of this app. Use of the app is entirely ")
-                    + Text("at the user's own risk").bold()
-                    + Text(".")
+                Text(
+                    "This app is provided **\"as is\"**, without warranties of any kind. To the fullest extent permitted by applicable law, Curley Brackets Engineering Ltd accepts **no liability for loss, damage, or injury** arising from use of this app. Use of the app is entirely **at the user's own risk**."
                 )
             }
         }

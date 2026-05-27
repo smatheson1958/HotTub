@@ -64,12 +64,12 @@ struct AppPalette {
             return isDark ? Color(hex: 0xFFFFFF) : Color(hex: 0x000000)
         case .textSecondary:
             return isDark
-                ? Color(red: 235 / 255, green: 235 / 255, blue: 245 / 255).opacity(0.6)
-                : Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.6)
+                ? Color(red: 235 / 255, green: 235 / 255, blue: 245 / 255).opacity(0.72)
+                : Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.72)
         case .textTertiary:
             return isDark
-                ? Color(red: 235 / 255, green: 235 / 255, blue: 245 / 255).opacity(0.3)
-                : Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.3)
+                ? Color(red: 235 / 255, green: 235 / 255, blue: 245 / 255).opacity(0.48)
+                : Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.48)
         case .accentBlue:
             return Color(hex: 0x007AFF)
         case .accentGreen:
@@ -77,7 +77,7 @@ struct AppPalette {
         case .accentRed:
             return Color(hex: 0xFF3B30)
         case .accentOrange:
-            return Color(hex: 0xFF9500)
+            return Color(hex: 0xE68600)
         case .accentYellow:
             return Color(hex: 0xFFCC00)
         case .accentIndigo:
@@ -97,9 +97,9 @@ struct AppPalette {
         case .statusSuccessText:
             return Color(hex: 0x1E6D34)
         case .statusWarningFill:
-            return Color(hex: 0xFF9500).opacity(0.12)
+            return Color(hex: 0xE68600).opacity(0.12)
         case .statusWarningBorder:
-            return Color(hex: 0xFF9500).opacity(0.35)
+            return Color(hex: 0xE68600).opacity(0.35)
         case .statusWarningText:
             return Color(hex: 0x8A4B00)
         case .statusErrorFill:
@@ -113,7 +113,7 @@ struct AppPalette {
         case .tagGreenFill:
             return Color(hex: 0x34C759).opacity(0.12)
         case .tagOrangeFill:
-            return Color(hex: 0xFF9500).opacity(0.12)
+            return Color(hex: 0xE68600).opacity(0.12)
         case .tagPinkFill:
             return Color(hex: 0xFF2D55).opacity(0.12)
         case .heroGradientStart:
